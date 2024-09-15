@@ -1,0 +1,362 @@
+# Dashboard Assignment
+# Jana Omaiche
+#
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(scales)
+library(shinydashboard)
+library(highcharter)
+library(tidyverse)
+library(data.table)
+library(leaflet)
+library(plotly)
+library(conflicted)
+library(billboarder)
+library(gganimate)
+conflict_prefer("box", winner = "shinydashboard")
+
+
+# Load 3 different drug mortality datasets (opioid, cocaine, amphetamine)
+opioid_data <- read.csv("death-rate-from-opioid-use.csv")
+cocaine_data <- read.csv("death-rates-cocaine.csv")
+amphetamine_data <- read.csv("death-rate-amphetamine.csv")
+
+
+# Merge datasets by Year, Entity, Code
+merged_data <- merge(opioid_data, cocaine_data, by = c("Year", "Entity", "Code"), all = TRUE)
+final_merged_data <- merge(merged_data, amphetamine_data, by = c("Year", "Entity", "Code"), all = TRUE)
+
+# Omit missing values
+clean_drug_data <- na.omit(final_merged_data)
+
+# Rename columns
+clean_drug_data <- clean_drug_data %>% rename("Opioid_death_rate" = "Deaths...Opioid.use.disorders...Sex..Both...Age..Age.standardized..Rate.", "Cocaine_death_rate" = "Deaths...Cocaine.use.disorders...Sex..Both...Age..Age.standardized..Rate.", "Amphetamine_death_rate" = "Deaths...Amphetamine.use.disorders...Sex..Both...Age..Age.standardized..Rate.", "Country" = "Entity")
+
+# Remove countries which are already included
+clean_drug_data <- clean_drug_data %>%
+  dplyr::filter(!(Country %in% c("World Bank High Income", "Region of the Americas (WHO)", "OECD Countries", "Western Pacific Region (WHO)")))
+
+# Re-name north america 
+clean_drug_data <- clean_drug_data %>%
+  mutate(Country = case_when(
+    Country == "North America (WB)" ~ "North America",
+    TRUE ~ Country))
+
+
+# Dashboard creation
+ui <- fluidPage(
+  tags$h1("Illicit Drugs Global Mortality Rates", style = "font-size: 40px; text-decoration: underline;"),
+  
+  # Introduction
+  fluidRow(
+    column(12, 
+           h3("Despite significant efforts to address the illicit drugs crisis, global mortality rates continue to rise. 
+              The prevalence of these   drugs are unveiled for specific regions in the world, highlighting the need for strategies to improve public health and decrease mortality rates from drug use.", style = "font-size: 18px"),
+           hr()  # Horizontal line for separation
+    )
+  ),
+  
+  fluidRow(
+    box(
+      width = 12,
+      title = "Mortality rates over time (1990 - 2021)",
+      status = "primary",
+      solidHeader = TRUE,
+      tabsetPanel(
+        tabPanel("Opioid", plotOutput("plot1", height = 500)),
+        tabPanel("Cocaine", plotOutput("plot2", height = 500)),
+        tabPanel("Amphetamine", plotOutput("plot3", height = 500))
+      )
+    )
+  ),
+  fluidRow(
+    box(
+      width = 4,
+      title = "Opioid",
+      status = "primary",
+      solidHeader = TRUE,
+      plotOutput("opioid_pie")
+    ),
+    box(
+      width = 4,
+      title = "Cocaine",
+      status = "primary",
+      solidHeader = TRUE,
+      plotOutput("cocaine_pie")
+    ),
+    box(
+      width = 4,
+      title = "Amphetamine",
+      status = "primary",
+      solidHeader = TRUE,
+      plotOutput("amphetamine_pie")
+    ),
+    
+    # Empty fluidRow for break
+    fluidRow(),
+    
+    # Data source footer
+    tags$footer(
+      style = "text-align: center; padding-top: 12px; colour: #888; margin-top: 20px; margin-bottom: 20px",
+      "Data Source: IHME, Global Burden of Disease (2019)"
+    ),
+    
+    # Extra underline
+    hr(),
+    
+    # Summary at the bottom of the page
+    fluidRow(
+      column(12, 
+             h4("Summary:", style = "font-size: 25px;"),
+             textOutput("overall_mortality_bottom")
+      ),
+      
+      # CSS styling for summary text
+      tags$style(HTML("#overall_mortality_bottom {font-size: 18px;}"))
+    )
+  )
+)
+
+server <- function(input, output) {
+  
+  
+  # Custom colour palette for countries
+  custom_country_colours <- c("North America" = "#A3FFCE",
+                              "Estonia" = "mediumpurple1",
+                              "United States" = "deepskyblue1",
+                              "Scotland" = "deepskyblue4",
+                              "Russia" = "#716ADF",
+                              "Norway" = "pink1",
+                              "Switzerland" = "cyan3",
+                              "Canada" = "springgreen2",
+                              "Wales" = "#3874CF",
+                              "Finland" = "mediumorchid4",
+                              "Iran" = "plum3",
+                              "Puerto Rico" = "#64E1ED",
+                              "United States Virgin Islands" = "lightskyblue",
+                              "Bermuda" = "palevioletred1",
+                              "Guatemala" = "purple",
+                              "United Arab Emirates" = "#D880AD",
+                              "Grenada" = "#C36DE6",
+                              "China" = "#963A63",
+                              "Taiwan" = "plum1",
+                              "Honduras" = "#473CCC",
+                              "Dominica" = "violet"
+  )
+  
+  
+  # Function to create pie charts
+  create_pie_chart <- function(data, title) {
+    top_countries <- data %>%
+      arrange(desc(DeathRate)) %>%
+      slice_head(n = 10)  # Select top 10 countries
+    
+    ggplot(top_countries, aes(x = "", y = DeathRate, fill = Country)) +
+      geom_bar(stat = "identity", width = 1, colour = "grey26") +
+      coord_polar("y") +
+      scale_fill_manual(values = custom_country_colours) +
+      labs(title = title, fill = "Country") +
+      theme_void() +
+      theme(legend.key.size = unit(2, "lines"), 
+            legend.text = element_text(size = 12), 
+            legend.title = element_text(size = 14, face = "bold"), 
+            panel.border = element_rect(color = "black", fill = NA, size = 1), 
+            panel.background = element_rect(fill = "white")  
+      )
+  }
+  
+  
+  # Opioid pie chart
+  output$opioid_pie <- renderPlot({
+    tryCatch({
+      top_countries <- clean_drug_data %>%
+        group_by(Country) %>%
+        summarise(Opioid_death_rate = sum(Opioid_death_rate)) %>%
+        arrange(desc(Opioid_death_rate)) %>%
+        slice_head(n = 10)  # Select top 10 countries
+      
+      ggplot(top_countries, aes(x = "", y = Opioid_death_rate, fill = Country, label = scales::percent(Opioid_death_rate / sum(Opioid_death_rate)))) +
+        geom_bar(stat = "identity", width = 1, colour = "white") +
+        coord_polar("y", start = 0) +
+        scale_fill_manual(values = custom_country_colours) +
+        labs(title = "Top 10 Countries for Opioid Mortalities", fill = "Country") +
+        theme_void() +
+        theme(
+          legend.key.size = unit(2, "lines"), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_text(size = 14, face = "bold"), 
+          panel.border = element_rect(color = "black", fill = NA, size = 1), 
+          panel.background = element_rect(fill = "white"),
+          plot.title = element_text(size = 16)  
+        ) +
+        geom_text(
+          aes(label = paste0(round(Opioid_death_rate / sum(Opioid_death_rate) * 100), "%")),
+          position = position_stack(vjust = 0.5),
+          size = 5,
+          colour = "black"
+        )
+    }, error = function(e) {
+      cat("Error in opioid_pie:", conditionMessage(e), "\n")
+      print(e)
+      return(NULL)
+    })
+  })
+  
+  # Cocaine pie chart
+  output$cocaine_pie <- renderPlot({
+    tryCatch({
+      top_countries <- clean_drug_data %>%
+        group_by(Country) %>%
+        summarise(Cocaine_death_rate = sum(Cocaine_death_rate)) %>%
+        arrange(desc(Cocaine_death_rate)) %>%
+        slice_head(n = 10)  # Select top 10 countries
+      
+      ggplot(top_countries, aes(x = "", y = Cocaine_death_rate, fill = Country, label = scales::percent(Cocaine_death_rate / sum(Cocaine_death_rate)))) +
+        geom_bar(stat = "identity", width = 1, colour = "white") +
+        coord_polar("y", start = 0) +
+        scale_fill_manual(values = custom_country_colours) +
+        labs(title = "Top 10 Countries for Cocaine Mortalities", fill = "Country") +
+        theme_void() +
+        theme(
+          legend.key.size = unit(2, "lines"), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_text(size = 14, face = "bold"), 
+          panel.border = element_rect(color = "black", fill = NA, size = 1), 
+          panel.background = element_rect(fill = "white"),
+          plot.title = element_text(size = 16)  
+        ) +
+        geom_text(
+          aes(label = paste0(round(Cocaine_death_rate / sum(Cocaine_death_rate) * 100), "%")),
+          position = position_stack(vjust = 0.5),
+          size = 5,
+          colour = "black"
+        )
+    }, error = function(e) {
+      cat("Error in cocaine_pie:", conditionMessage(e), "\n")
+      print(e)
+      return(NULL)
+    })
+  })
+  
+  # Amphetamine pie chart
+  output$amphetamine_pie <- renderPlot({
+    tryCatch({
+      top_countries <- clean_drug_data %>%
+        group_by(Country) %>%
+        summarise(Amphetamine_death_rate = sum(Amphetamine_death_rate)) %>%
+        arrange(desc(Amphetamine_death_rate)) %>%
+        slice_head(n = 10)  # Select top 10 countries
+      
+      ggplot(top_countries, aes(x = "", y = Amphetamine_death_rate, fill = Country, label = scales::percent(Amphetamine_death_rate / sum(Amphetamine_death_rate)))) +
+        geom_bar(stat = "identity", width = 1, colour = "white") +
+        coord_polar("y", start = 0) +
+        scale_fill_manual(values = custom_country_colours) +
+        labs(title = "Top 10 Countries for Amphetamine Mortalities", fill = "Country") +
+        theme_void() +
+        theme(
+          legend.key.size = unit(2, "lines"), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_text(size = 14, face = "bold"), 
+          panel.border = element_rect(color = "black", fill = NA, size = 1), 
+          panel.background = element_rect(fill = "white"),
+          plot.title = element_text(size = 16)  
+        ) +
+        geom_text(
+          aes(label = paste0(round(Amphetamine_death_rate / sum(Amphetamine_death_rate) * 100), "%")),
+          position = position_stack(vjust = 0.5),
+          size = 5,
+          colour = "black"
+        )
+    }, error = function(e) {
+      cat("Error in amphetamine_pie:", conditionMessage(e), "\n")
+      print(e)
+      return(NULL)
+    })
+  })
+  
+  # Plot 1: Opioid
+  output$plot1 <- renderPlot({
+    # Calculating total death rate for each year - opioids
+    total_death_rate <- clean_drug_data %>%
+      group_by(Year) %>%
+      summarise(total_death_rate = sum(Opioid_death_rate))
+    
+    ggplot(total_death_rate, aes(x = Year, y = total_death_rate, text = paste("Year: ", Year, "<br>Total Death Rate: ", total_death_rate))) +
+      geom_bar(stat = "identity", fill = "#29AEFF", colour = "black") +
+      labs(title = "Global Opioid Death Rates Over Time", y = "Total death rate (per 100,000 people)", x = "Year") +
+      theme_minimal() +
+      theme(
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 20)
+      ) +
+      scale_x_continuous(breaks = seq(1990, 2019, by = 1), expand = c(0.01, 0.01)) +
+      scale_y_continuous(limits = c(0, 200), breaks = seq(0, 200, by = 20), expand = c(0, 0))
+  })
+  
+  # Plot 2: Cocaine
+  output$plot2 <- renderPlot({
+    # Calculating total death rate for each year - cocaine
+    total_death_rate <- clean_drug_data %>%
+      group_by(Year) %>%
+      summarise(total_death_rate = sum(Cocaine_death_rate))
+    
+    ggplot(total_death_rate, aes(x = Year, y = total_death_rate, text = paste("Year: ", Year, "<br>Total Death Rate: ", total_death_rate))) +
+      geom_bar(stat = "identity", fill = "#544FE5", colour = "black") +
+      labs(title = "Global Cocaine Death Rates Over Time", y = "Total death rate (per 100,000 people)", x = "Year") +
+      theme_minimal() +
+      theme(
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 20)
+      ) +
+      scale_x_continuous(breaks = seq(1990, 2019, by = 1), expand = c(0.01, 0.01)) +
+      scale_y_continuous(limits = c(0, 28), breaks = seq(0, 28, by = 4), expand = c(0, 0))
+  })
+  
+  # Plot 3: Amphetamine
+  output$plot3 <- renderPlot({
+    # Calculating total death rate for each year - amphetamines
+    total_death_rate <- clean_drug_data %>%
+      group_by(Year) %>%
+      summarise(total_death_rate = sum(Amphetamine_death_rate))
+    
+    ggplot(total_death_rate, aes(x = Year, y = total_death_rate, text = paste ("Year: ", Year, "<br>Total Death Rate: ", total_death_rate))) +
+      geom_bar(stat = "identity", fill = "#E356B4", colour = "black") +
+      labs(title = "Global Amphetamine Death Rates Over Time", y = "Total death rate (per 100,000 people)", x = "Year") +
+      theme_minimal() +
+      theme(
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 20)
+      ) +
+      scale_x_continuous(breaks = seq(1990, 2019, by = 1), expand = c(0.01, 0.01)) +
+      scale_y_continuous(limits = c(0, 16), breaks = seq(0, 16, by = 2), expand = c(0, 0))
+  })
+  
+  
+  
+  # Summary: 
+  output$overall_mortality_bottom <- renderText({
+    "There is a concerning upward trend in mortality rates associated with illicit drugs over the nearly three-decade period. Specifically, deaths related to opioids, cocaine, and amphetamines have experienced a significant increase, highlighting a persistent public health challenge. Despite substantial efforts to address the crisis, the findings underscore the absence of discernible positive impacts on a global scale, and affecting some countries more than others."})
+  
+}
+
+
+# Running the application
+shinyApp(ui = ui, server = server)
+................
