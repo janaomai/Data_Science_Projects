@@ -1,0 +1,404 @@
+---
+title: "Top IMDB movies box office revenue data analysis"
+author: "Jana Omaiche"
+subtitle: Assignment 3
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  pdf: default
+  word_document: default
+---
+
+### **Setup** 
+
+The packages which are relevant to producing the report will be loaded:
+```{r}
+library(readr) #importing data
+library(openxlsx) #opening xlsx files
+library(knitr) #generating report as HTML/pdf/word
+library(dplyr) #data manipulation & summary statistics
+library(magrittr) #forward pipe operator
+library(lubridate) #manipulating dates/times
+library(outliers) #scanning for outliers
+library(forecast) #Box-Cox transformation
+library(conflicted) #avoid conflicts with dplyr functions
+```
+
+
+### **Data Description**
+
+The website URL of dataset 1, containing the top 1000 movies and TV shows from IMDB, was sourced from https://www.kaggle.com/datasets/harshitshankhdhar/imdb-dataset-of-top-1000-movies-and-tv-shows. The website URL of dataset 2, containing the all time worldwide movie box office, locations was sourced from https://www.kaggle.com/datasets/kkhandekar/all-time-worldwide-box-office. The data will be described, read, imported, and merged. The variable descriptions are provided below.
+
+* **Variable descriptions for Dataset 1 (IMDB top 1000 movies data):**
+  + Poster Link (poster link for IMDB)
+  + Series Title (movie name)
+  + Released Year (year the movie was released)
+  + Certificate (certificate of the movie (U = unrestricted, UA = unrestricted with parental advisory, A = adult restricted, G = general audience, PG = parental guidance for children under 15, PG-13 = parental guidance for children under 13, TV-13 = not suitable for children under 14, R = restricted or under 17 needs to be accompanied by a parent)
+  + Runtime (total duration of movie (minutes))
+  + Genre (genre of the movie (e.g. Drama, Romance, Comedy, Action, etc.))
+  + IMDB rating (rating of the movie from 1-10 per IMDB)
+  + Overview (summary of the movie)
+  + Meta Score (average IMDB metacritic score from 0-100)
+  + Director (name of movie director)
+  + Star 1 (name of first movie star)
+  + Star 2 (name of second movie star)
+  + Star 3 (name of third movie star)
+  + Star 4 (name of fourth movie star)
+  + No of Votes (total number of votes from IMDB users)
+  + Gross (Total money earned by the movie (USD))
+  
+* **Variable descriptions for Dataset 2 (Worldwide movie box office data):**
+  + Rank (ranking of the movie per box office collection)
+  + Year (year the movie was released)
+  + Movie (name of the movie)
+  + Worldwide box office (worldwide total amount of money paid by people to watch the movie (USD))
+  + Domestic box office (North America total amount of money paid by people to watch the movie (USD))
+  + International box office (All other countries (not including North America) total amount of money paid by people to watch the movie (USD))
+
+
+#### Reading/importing the data:
+
+Both files were extracted from their zip files and opened as a .csv file in Microsoft Excel. Both dataset files were then exported and saved as an .xlsx file. The .xlsx file types are preferred over .csv due to the way the data information is stored. Using the format and content of the worksheets rather than plain text format allows better storage of complex and large datasets (Toggle 2023). Dataset 1 will be assigned to 'imdb', and dataset 2 will be assigned to 'box_office'. The dimensions of both datasets will be checked using the dim() function. The output will show 1000 observations (rows) with 16 variables (columns) for the first dataset, and 595 observations (rows) with 6 variables (columns) for the second dataset.
+
+```{r}
+#Reading/importing dataset 1
+imdb <- read.xlsx("D:/imdb_top_movies.xlsx")
+
+#Reading/importing dataset 2
+box_office <- read.xlsx("D:/worldwide_box_office.xlsx")
+
+dim(imdb)
+dim(box_office)
+```
+
+#### Identifying the variable data types for both datasets:
+
+The str() function will be used to identify the variable data structure types for dataset 1 and dataset 2. Both datasets include characters and numeric data types. There are variables which will be converted to factors after merging the datasets.
+
+```{r}
+#Variable data structure types for dataset 1 (imdb):
+str(imdb)
+```
+
+```{r}
+#Variable data types for dataset 2 (box_office):
+str(box_office)
+```
+
+#### Changing variable names to match:
+
+Both datasets will be merged based on the movie title and year released common variables. Before merging the datasets, the variable names for 'Movie' and 'Year' need to be changed in dataset 1 to match the naming of variables in dataset 2. The rename() function will be used with the pipe operator for the 'imdb' dataset.
+```{r}
+#Changing movie variable names:
+imdb <- imdb %>% rename(Movie = Series_Title, Year = Released_Year)
+```
+
+
+#### Merging the datasets:
+
+Dataset 1 and dataset 2 will be merged based on the 'Movie' and 'Year' variables using the merge() function. The merged dataset will be named movie_revenue. The dimensions will also be checked after merging, which will result to 126 observations (rows) and 20 variables (columns).
+```{r}
+#Merging the two datasets
+movie_revenue <- merge(box_office, imdb)
+
+#Printing the combined dataset
+print(head(movie_revenue))
+
+#Viewing the dimensions of the merged dataset
+dim(movie_revenue)
+```
+
+
+### **Understand**
+
+Some of the variables in the merged dataset will be converted to numeric or nominal/ordinal factor types. The certificate and genre variables will be converted from character to nominal factors as they contains categorised unordered data values. The runtime variable will be converted from character to numeric as it displays time values in minutes, also the 'min' in the values will be removed to avoid misinterpretation and incorrect data analysis as a numeric variable. The sub() function will be used to substitute the ' min' with blank "" instead. The IMDB rating and meta score will be converted from numeric to ordinal factors as they contain an order of rating levels from 1-10, and 0-100. The higher the values are for the IMDB rating and meta score, the better the rating/score is. The newly converted variables in the merged dataset will be inspected using str().
+
+
+```{r}
+#Converting Certificate variable from character to nominal factor
+movie_revenue$Certificate <- as.factor(movie_revenue$Certificate)
+
+#Converting Runtime variable from character to numeric (and removing 'min' in the data values)
+movie_revenue$Runtime <- as.numeric(sub(" min", "", movie_revenue$Runtime))
+
+#Converting Genre variable from character to nominal factor
+movie_revenue$Genre <- as.factor(movie_revenue$Genre)
+
+#Converting IMDB rating variable from numeric to ordinal factor
+movie_revenue$IMDB_Rating <- factor(movie_revenue$IMDB_Rating, ordered = TRUE)
+
+#Converting Meta score variable from numeric to ordinal factor
+movie_revenue$Meta_score <- factor(movie_revenue$Meta_score, ordered = TRUE)
+
+#Viewing new variable types and structures
+str(movie_revenue)
+```
+
+
+###	**Tidy & Manipulate Data I**
+
+There are a few reasons as to why the data is untidy. Firstly, there are unclear variable naming titles which will be changed to become more descriptive and user-friendly. Some irrelevant variables, such as 'Poster Link' and 'Overview' are still present in the merged dataset which is not needed for the data analysis. The Gross variable will also be removed as it shows the same data value representation of the Domestic box office variable. Therefore, these three variables will be removed by using subset() and the column removal function -c() where the Poster_Link, Overview, and Gross variables will be selected for removal. The subset() function indicates a subset of rows to be extracted from the dataframe. There are also missing values in both dataset 1 and dataset 2 which will be scanned and removed in section 'Scan I'. 
+
+```{r}
+#Removal of 'Poster Link' and 'Overview' variables
+movie_revenue <- subset(movie_revenue, select = -c(Poster_Link, Overview, Gross))
+
+#Renaming variables in the merged dataset to more descriptive titles
+colnames(movie_revenue)[1] <- "Year_released"
+colnames(movie_revenue)[2] <- "Movie_title"
+colnames(movie_revenue)[4] <- "Worldwide_box_office"
+colnames(movie_revenue)[5] <- "Domestic_box_office"
+colnames(movie_revenue)[6] <- "International_box_office"
+colnames(movie_revenue)[7] <- "Movie_classification"
+colnames(movie_revenue)[8] <- "Runtime_minutes"
+colnames(movie_revenue)[10] <- "IMDB_rating"
+colnames(movie_revenue)[11] <- "IMDB_metascore"
+colnames(movie_revenue)[13] <- "Movie_star_1"
+colnames(movie_revenue)[14] <- "Movie_star_2"
+colnames(movie_revenue)[15] <- "Movie_star_3"
+colnames(movie_revenue)[16] <- "Movie_star_4"
+colnames(movie_revenue)[17] <- "Total_IMDB_user_votes"
+
+#Printing of the merged dataset after changes
+print(head(movie_revenue))
+```
+
+###	**Tidy & Manipulate Data II** 
+
+The data is already considered tidy due to its long format structure, which is the most suitable type for data analysis involving multiple variables. To manipulate the merged dataset, the variables can be mutated to create new variables. The new variables will provide deeper insights for a better comprehensive understanding and interpretation of the dataset. One of these will include creating a 'Age of movie in years' variable by subtracting the year released variable from the current system date's year (currently in the year 2023). By calculating the age of the movie, the success of the movie can be tracked over time. Also, the film industry can identify what ideas and concepts these popular movies involved that made them succeed in audience attraction. These insights will help with marketing strategies and decisions when producing new films or re-producing popular films from the past. The 'age of movie in years' variable will be created using the piping operator %>% followed by the mutate() function. The year(Sys.Date()) function will be coded to generate the systems current year of today's date, followed by subtracting the 'Year released' variable. Using the system date will allow for reproducibility later on when time passes by. 
+
+Another new variable will be created by mutating the 'Runtime minutes' variable to sort the time lengths of the movies by "Short", "Average", and "Long". By identifying the length of the movie by a character category, it will make it easier to compare which movies were short/average/long and how they impacted the sales. For example, a movie may be short to provide quick entertainment for younger audiences with shorter attention spans such as children, whereas, other movies may be longer to target older audiences who are looking for an immerse experience (Follows 2023). Another useful insight is comparing the genre to the movie length category to identify if comedy movies are shorter than other genres and how that impacts the movie box office or ratings. When a movie length is longer, it also means there are extra expenses in the film such as increasing costs of cameramen (Mueller 2022). Therefore, it is interesting to see how the box office is affected by the duration of film times. The short category will include runtime of less than 96 minutes, average will include runtimes between 96 and 120 minutes, and long will include runtimes of more than 120 minutes (Follows 2023). The pipe operator and mutate() function will be used as well, followed by coding case_when() to distinguish what the category names will be for the runtime minute periods. The 'Movie length' variable will be converted from a numeric to ordinal factor data type afterwards. To further tidy the merged dataset, the columns will be reordered to improve readability and presentation of the dataset. The select() function will be used after using the pipe operator with the movie_revenue dataset. The order of the variables (columns) will be re-sorted in the mrged dataset to improve readability. The first 6 rows will then be printed to show the new mutated variables and order of columns.
+
+
+```{r}
+#Creating an age of movie variable by mutating Year released 
+movie_revenue <- movie_revenue %>% mutate(Age_of_movie_in_years = year(Sys.Date()) - Year_released)
+
+#Creating a Movie_length variable by mutating the Runtime_minutes variable
+movie_revenue <- movie_revenue %>%
+  mutate(Movie_length = case_when(
+    Runtime_minutes < 96 ~ "Short",
+    Runtime_minutes >= 96 & Runtime_minutes <= 120 ~ "Average",
+    Runtime_minutes > 120 ~ "Long"))
+
+#Converting Movie_length from character to ordinal factor
+movie_revenue$Movie_length <- factor(movie_revenue$Movie_length, ordered = TRUE)
+
+#Re-ordering the columns to improve readability
+movie_revenue <- movie_revenue %>% select(Rank, Movie_title, Year_released, Age_of_movie_in_years, Genre, Movie_classification, Runtime_minutes, Movie_length, Director, Movie_star_1, Movie_star_2, Movie_star_3, Movie_star_4, IMDB_rating, IMDB_metascore, Total_IMDB_user_votes, Domestic_box_office, International_box_office, Worldwide_box_office)
+
+#Printing merged dataset with new mutated variables and re-organised variable positions
+print(head(movie_revenue))
+```
+
+###	**Scan I**
+
+The original and merged datasets will be scanned for missing values, errors, and inconsistencies. Using colSums(is.na()) will identify how many missing values are in each column (variable). To then identify what the missing values are in the datasets, which(is.na()) is coded. 
+```{r}
+#Scanning dataset 1 - amount of missing values for each variable
+colSums(is.na(imdb))
+
+#Scanning dataset 1 - missing values for dataset 1
+which(is.na(imdb))
+
+```
+
+```{r}
+#Scanning dataset 2 - amount of missing values for each variable
+colSums(is.na(box_office))
+
+#Scanning dataset 2 - missing values for dataset 2
+which(is.na(box_office))
+```
+
+```{r}
+#Scanning merged dataset - amount of missing values for each variable
+colSums(is.na(movie_revenue))
+
+#Scanning merged dataset - missing values for merged dataset
+which(is.na(movie_revenue))
+```
+
+There is missing data in both the original datasets, and the merged dataset. Most of the missing values have not been included in the merged dataset because the datasets were merged by the common movie names and year released variables. Therefore, only relevant data values are present in the merged dataset. To remove the missing values in the merged dataset, na.omit() is coded and assigned to clean_movie_revenue. As there were only 2 data values missing from the IMDB metascore variable, there should be a total of 124 rows (observations) and 19 columns (variables) in the clean merged dataset after omitting the missing values.
+
+```{r}
+#Omitting the missing values in the merged dataset
+clean_movie_revenue <- na.omit(movie_revenue)
+
+#Re-checking dimensions after omitting missing values
+dim(clean_movie_revenue)
+```
+
+
+###	**Scan II**
+
+#### Non-parametric test:
+
+The merged dataset will be scanned for outliers using Tukey's method which is a non-parametric test. Tukey's method uses box plots which illustrate outliers as the values which fall below or above the lower/upper fences. The boxplot() function will be used to create the figures, including 'main =' to add a title, 'ylab =' to label the y-axis, 'col =' to set a colour for each figure, and 'ylim =' to set the y-axis measurements. After the data is confirmed to be normally distributed, the z-score method will be used as a parametric test. Both of these methods are used for univariate variables, meaning analysing one variable at a time (Dolgun et al. 2023). Only relevant numeric variables (such as sales and total votes variables) will be used for identifying outliers as their values can be used to calculate the mean, median, interquartile ranges, minimum, maximum, and z-score values. The observed outliers will be removed from the dataset to avoid misinterpretation, incorrect analysis, and bias.
+<br>
+<br>
+
+
+```{r}
+#Tukey's method - boxplot for domestic box office
+clean_movie_revenue$Domestic_box_office %>% boxplot(main = "Box plot of Domestic box office", ylab = "Domestic box office (USD)", col = "aquamarine")
+
+#Tukey's method - boxplot for international box office
+clean_movie_revenue$International_box_office %>% boxplot(main = "Box plot of International box office", ylab = "International box office (USD)", col = "maroon1")
+
+#Tukey's method - boxplot for worldwide box office
+clean_movie_revenue$Worldwide_box_office %>% boxplot(main = "Box plot of Worldwide box office", ylab = "Worldwide box office (USD)", col = "darkorchid")
+
+#Tukey's method - boxplot for total imdb user votes
+clean_movie_revenue$Total_IMDB_user_votes %>% boxplot(main = "Box plot of Total IMDB user votes", ylab = "Total IMDB user votes", col = "gold2", ylim = c(0, 2500000))
+```
+
+#### Parametric test:
+
+It is shown through the non-parametric test that there are outliers present in the four numeric variables which were analysed. Therefore, using a parametric outlier detection method (z-scores) will scan the outliers which are greater than 2 standard deviations from the mean in a normal distribution. The outliers::scores(type = "z") will calculate the z-scores for the values in the four numeric variables. The variables will be piped and selected from the clean_movie_revenue dataset using c("Domestic_box_office", "International_box_office", "Worldwide_box_office", "Total_IMDB_user_votes"). The z-score values will then be assigned to z_scores. The rowSums() function will be used to select all rows in the matrix, followed by abs(z_scores)>2) which will calculate the the absolute values of the z-scored which are greater than 2 standard deviations. The selected outlier values which are greater than 2 standard deviations will then be assigned to outlier_rows. Afterwards, the outlier rows will be omitted from the dataset using [!outlier_rows, ] and assigned to 'final_movie_revenue'. The final_movie_revenue dataset will be printed and show a new total of 113 observations as all rows with outliers greater than 2 standard deviations have been successfully removed from the merged dataset. The amount of variables will remain the same. 
+
+```{r}
+#Calculating the z-scores for the 4 numeric variables
+z_scores <- clean_movie_revenue[, c("Domestic_box_office", "International_box_office", "Worldwide_box_office", "Total_IMDB_user_votes")] %>% outliers::scores(type = "z")
+
+#Selecting z-score rows with absolute values of > 2 standard deviations
+outlier_rows <- rowSums(abs(z_scores) > 2)
+
+#Removing outliers & assigning to final_movie_revenue
+final_movie_revenue <- clean_movie_revenue[!outlier_rows, ]
+
+#Printing merged dataset with outliers removed                      
+print(head(final_movie_revenue))
+```
+
+
+###	**Transform** 
+
+Histograms will be produced for the four numeric variables (domestic box office, international box office, worldwide box office, Total IMDB user votes) to check the normal distribution and skewness of the data. The central limit theorem theorises that an increased sample sized dataset improves the approximation of drawing random values from a normal distribution (Dolgun et al. 2023). Since the dataset has been reduced to 113 rows after removing missing values and outliers, the sample size is smaller. Therefore, the accuracy and reliability to assess data's normality decreases. The hist() is function is used to create the histograms, 'main =' is used to title the histograms, 'xlab =' is used to label the x-axis variable, and 'col =' is used to assign a colour. If skewness in the data is observed, then transformations will be applied to help observe the normal distributions.
+
+```{r}
+suppressWarnings({
+
+#Histogram of domestic box office
+hist(final_movie_revenue$Domestic_box_office, main = "Histogram of top movies domestic box office", xlab = "Domestic box office (USD)", col = "aquamarine")
+
+#Histogram of international box office
+hist(final_movie_revenue$International_box_office, main = "Histogram of top movies international box office ", xlab = "International box office (USD)", col = "maroon1")
+
+#Histogram of worldwide box office
+hist(final_movie_revenue$Worldwide_box_office, main = "Histogram of top movies worldwide box office", xlab = "Worldwide box office (USD)", col = "darkorchid")
+
+#Histogram of total IMDB user votes
+hist(final_movie_revenue$Total_IMDB_user_votes, main = "Histogram of top movies total IMDB user votes", xlab = "Total IMDB user votes", col = "gold2")
+
+
+})
+```
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+
+All of the histograms are slightly or heavily right-skewed. The international and worldwide box office have the most right skewness compared to the domestic box office and total IMDB user votes variables. Therefore, a log transformation will be applied to domestic box office and total IMDB user votes variables to calculate the natural logarithm. The log() function will be used to apply log transformations, followed by hist() to re-produce the histogram with the logged values. The Box-Cox transformation will be applied to the international and worldwide box office variables to help find a maximum log-likelihood and reduce the heavily right-skewed data. The BoxCox() function will be used to apply the Box-Cox transformation which is loaded from the forecast package, followed by lamba = "auto". The lambda is being set to automatic so that the maximum log-likelihood is used to produce the optimal value. The hist() function will be used afterwards to re-produce the histogram with the Box-Cox transformed values.
+
+```{r}
+#Log transformation of domestic box office
+log_domestic <- log(final_movie_revenue$Domestic_box_office)
+
+#Histogram of log transformation domestic box office
+hist(log_domestic, main = "Histogram of Log transformed top movies domestic box office", xlab = "Log domestic box office (USD)", col = "aquamarine")
+
+
+#Box-Cox transformation of international box office
+box_international <- BoxCox(final_movie_revenue$International_box_office, lambda = "auto")
+
+#Histogram of Box-Cox transformation international box office
+hist(box_international, main = "Histogram of Box-Cox transformed top movies international box office", xlab = "Box-Cox international box office (USD)", col = "maroon1")
+
+
+#Box-Cox transformation of worldwide box office
+box_worldwide <- BoxCox(final_movie_revenue$Worldwide_box_office, lambda = "auto")
+
+#Histogram of Box-Cox transformation worldwide box office
+hist(box_worldwide, main = "Histogram of Box-Cox transformed top movies worldwide box office ", xlab = "Box-Cox worldwide box office (USD)", col = "darkorchid")
+
+
+#Log transformation of total IMDB user votes
+log_imdb <- log(final_movie_revenue$Total_IMDB_user_votes)
+
+#Histogram of log transformation total IMDB user votes
+hist(log_imdb, main = "Histogram of Log transformed top movies total IMDB user votes", xlab = "Log Total IMDB user votes", col = "gold2")
+```
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+### **Reference List:**
+
+Bache S, Wickham H (2022) *magrittr: A Forward-Pipe Operator for R*, R package version 2.0.3, accessed 8 August 2023. https://CRAN.R-project.org/package=magrittr
+
+Dolgun A, Smith S and Stewart D (2023) ‘Data Wrangling’ [modules, MATH2405], RMIT University, Melbourne
+
+Follows S (2023) *Are Hollywood movies getting longer?*, Stephen Follows, accessed 8 August 2023. https://stephenfollows.com/are-hollywood-movies-getting-longer/#:~:text=Half%20of%20all%20Hollywood%20movies,shortest%20are%20animations%20and%20documentaries.
+
+Hyndman R and Khandakar Y (2008) 'Automatic time series forecasting: the forecast package for R.', *Journal of Statistical Software*, 26(3):1-22, doi: 10.18637/jzz.v027.i03
+
+Mueller A (2022) *Why Movies Cost So Much to Make*, Investopedia, accessed 8 August 2023. https://www.investopedia.com/financial-edge/0611/why-movies-cost-so-much-to-make.aspx
+
+Toggl (2023) *Difference Between CSV and XLS*, Toggl track, accessed 8 August 2023. https://toggl.com/track/difference-between-csv-xls/
+
+Wickham H, François R, Henry L, Müller K and Vaughan D (2023) *dplyr: A Grammar of Data Manipulation*, R package version 1.1.2, accessed 8 August 2023. https://CRAN.R-project.org/package=dplyr
+
+Xie Y (2023) *knitr: A General-Purpose Package for Dynamic Report Generation in R*, R package version 1.43, accessed 12 August 2023. https://yihui.org/knitr/
+
+Yihui Xie (2015) *The R Series: Dynamic Documents with R and knitr*, 2nd edition, Chapman and Hall/CRC, doi:10.1201/b15166
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
