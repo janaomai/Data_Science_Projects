@@ -1,0 +1,396 @@
+Data Analysis - WNW New Engine Algorithm
+MATH2406: Assignment 3
+Jana Omaiche
+
+Setup
+The following packages will be loaded to help produce the analysis:
+suppressPackageStartupMessages({
+library(readr, quietly = TRUE) # importing data
+library(dplyr, quietly = TRUE) # manipulating data
+library(lubridate, quietly = TRUE) # manipulating dates/times
+library(outliers, quietly = TRUE) # scanning for outliers
+library(ggplot2, quietly = TRUE) # building visualisations
+library(knitr, quietly = TRUE) # generating reports in different formats
+library(MASS, quietly = TRUE) # generating bivariate normal distribution
+library(stats, quietly = TRUE) # ANOVA
+library(tidyr, quietly = TRUE) # pivoting
+library(pwr, quietly = TRUE) # A/B testing
+})
+
+Reading/importing the data:
+# reading/importing dataset
+streaming_df <- read.csv("D:/RMIT/MATH2406/streaming_data.csv")
+
+# dimensions of df
+dim(streaming_df)
+## [1] 1000    8
+# variable data structure types
+str(streaming_df)
+## 'data.frame':    1000 obs. of  8 variables:
+##  $ date             : chr  "1-Jul" "1-Jul" "1-Jul" "1-Jul" ...
+##  $ gender           : chr  "F" "F" "F" "M" ...
+##  $ age              : int  28 32 39 52 25 51 53 42 41 20 ...
+##  $ social_metric    : int  5 7 4 10 1 0 5 6 8 7 ...
+##  $ time_since_signup: num  19.3 11.5 4.3 9.5 19.5 22.6 4.2 8.5 16.9 23 ...
+##  $ demographic      : int  1 1 3 4 2 4 3 4 4 2 ...
+##  $ group            : chr  "A" "A" "A" "A" ...
+##  $ hours_watched    : num  4.08 2.99 5.74 4.13 4.68 3.4 3.07 2.77 2.24 5.39 ...
+# changing social metric variable type to ordinal factor (0-10)
+streaming_df$social_metric <- as.factor(streaming_df$social_metric)
+
+# summary of variables
+summary(streaming_df)
+##      date              gender               age        social_metric
+##  Length:1000        Length:1000        Min.   :18.00   8      :113  
+##  Class :character   Class :character   1st Qu.:28.00   4      :110  
+##  Mode  :character   Mode  :character   Median :36.00   1      :109  
+##                                        Mean   :36.49   2      :103  
+##                                        3rd Qu.:46.00   9      : 97  
+##                                        Max.   :55.00   3      : 96  
+##                                                        (Other):372  
+##  time_since_signup  demographic       group           hours_watched  
+##  Min.   : 0.00     Min.   :1.000   Length:1000        Min.   :0.500  
+##  1st Qu.: 5.70     1st Qu.:2.000   Class :character   1st Qu.:3.530  
+##  Median :11.80     Median :3.000   Mode  :character   Median :4.415  
+##  Mean   :11.97     Mean   :2.603                      Mean   :4.393  
+##  3rd Qu.:18.70     3rd Qu.:4.000                      3rd Qu.:5.322  
+##  Max.   :24.00     Max.   :4.000                      Max.   :8.300  
+## 
+
+
+Cleaning the dataset:
+#Scanning dataset for amount of missing values in each variable
+colSums(is.na(streaming_df))
+##              date            gender               age     social_metric 
+##                 0                 0                 0                 0 
+## time_since_signup       demographic             group     hours_watched 
+##                 0                 0                 0                 0
+
+
+Normal distribution statistical analysis:
+numeric_vars <- streaming_df %>%
+  select_if(is.numeric)
+
+num_bins <- 30
+
+hist_plots <- numeric_vars %>%
+  pivot_longer(everything()) %>%
+  ggplot(aes(value)) +
+  geom_histogram(bins = num_bins, fill = "cadetblue1", color = "black", alpha = 0.7) +
+  facet_wrap(~name, scales = "free") +
+  labs(title = "Histograms of numeric variables", x = "Value", y = "Frequency")
+
+print(hist_plots)
+
+
+# Check for normality using the Shapiro-Wilk test
+shapiro_test_results <- numeric_vars %>%
+  summarise_all(~shapiro.test(.)$p.value)
+
+print(shapiro_test_results)
+##            age time_since_signup  demographic hours_watched
+## 1 7.366817e-17      8.751129e-19 6.617777e-30     0.2495042
+
+
+Biasness:
+# calculating how many people are in both groups
+group_counts <- table(streaming_df$group)
+
+print(group_counts)
+## 
+##   A   B 
+## 880 120
+# calculating the proportion of genders in Group A and B
+proportion_gender_A <- table(streaming_df[streaming_df$group == "A", "gender"]) / sum(streaming_df$group == "A")
+proportion_gender_B <- table(streaming_df[streaming_df$group == "B", "gender"]) / sum(streaming_df$group == "B")
+
+print(proportion_gender_A)
+## 
+##         F         M 
+## 0.4545455 0.5454545
+print(proportion_gender_B)
+## 
+##         F         M 
+## 0.2416667 0.7583333
+# barplot to compare the distributions in genders from group a and group b 
+barplot(rbind(proportion_gender_A, proportion_gender_B), beside = TRUE, 
+        col = c("maroon1", "purple"), names.arg = unique(streaming_df$gender),
+        legend.text = c("Group A", "Group B"), main = "Gender distribution of groups A & B")
+
+
+Statistical visualisations of variables:
+group_a_data <- streaming_df[streaming_df$group == "A", ]
+group_b_data <- streaming_df[streaming_df$group == "B", ]
+
+# Scatter plot for Group A
+plot_group_a <- ggplot(data = group_a_data, aes(x = age, y = hours_watched)) +
+  geom_point(position = position_jitter(width = 0.45, height = 0.45)) +
+  geom_smooth(method = "lm", se = FALSE, color = "hotpink") +
+  ggtitle("Scatter plot of hours watched vs. age (Group A)") +
+  labs(x = 'Age (years)', y = 'Hours watched')
+
+# Scatter plot for Group B
+plot_group_b <- ggplot(data = group_b_data, aes(x = age, y = hours_watched)) +
+  geom_point(position = position_jitter(width = 0.45, height = 0.45)) +
+  geom_smooth(method = "lm", se = FALSE, color = "purple") +
+  ggtitle("Scatter plot of hours watched vs. age (Group B)") +
+  labs(x = 'Age (years)', y = 'Hours watched')
+
+print(plot_group_a)
+## `geom_smooth()` using formula = 'y ~ x'
+
+
+print(plot_group_b)
+## `geom_smooth()` using formula = 'y ~ x'
+
+
+# Create separate scatter plots for Group A and Group B
+plot_group_a <- ggplot(data = group_a_data, aes(x = social_metric, y = hours_watched)) +
+  geom_point() +
+  labs(x = "Social metric", y = "Hours watched") +
+  ggtitle("Scatter plot of social metric vs. hours watched (Group A)")
+
+plot_group_b <- ggplot(data = group_b_data, aes(x = social_metric, y = hours_watched)) +
+  geom_point() +
+  labs(x = "Social metric", y = "Hours watched") +
+  ggtitle("Scatter plot of social metric vs. hours watched (Group B)")
+
+print(plot_group_a)
+
+
+print(plot_group_b)
+
+
+# boxplot of the dependent variable against group a vs group b
+custom_colors <- c("Group A" = "maroon1", "Group B" = "purple")
+
+gg <- ggplot(data = streaming_df, aes(x = group, y = hours_watched, fill = group)) +
+  geom_boxplot(color = "black", fill = custom_colors) +
+  labs(x = "Groups", y = "Hours watched") +
+  ggtitle("Boxplots of hours watched for Group A vs. Group B")
+
+print(gg)
+
+
+# summary statistics of dependent variable for both groups
+# Group A
+summary_A <- summary(streaming_df$hours_watched[streaming_df$group == "A"])
+
+# Group B
+summary_B <- summary(streaming_df$hours_watched[streaming_df$group == "B"])
+
+print(summary_A)
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   0.500   3.487   4.355   4.336   5.250   8.300
+print(summary_B)
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   1.525   3.939   4.860   4.811   5.723   7.930
+
+
+Simple regression analysis:
+Simple linear regression:
+
+# separating Group A and Group B data
+group_a_data <- streaming_df[streaming_df$group == "A", ]
+group_b_data <- streaming_df[streaming_df$group == "B", ]
+
+# linear regression models for each group
+linear_model_a <- lm(hours_watched ~ 1, data = group_a_data)
+linear_model_b <- lm(hours_watched ~ 1, data = group_b_data)
+
+# printing lm summaries
+summary_A <- summary(linear_model_a)
+summary_B <- summary(linear_model_b)
+
+print(summary_A)
+## 
+## Call:
+## lm(formula = hours_watched ~ 1, data = group_a_data)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -3.8361 -0.8486  0.0189  0.9139  3.9639 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)  4.33613    0.04464   97.14   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 1.324 on 879 degrees of freedom
+print(summary_B)
+## 
+## Call:
+## lm(formula = hours_watched ~ 1, data = group_b_data)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -3.2859 -0.8721  0.0491  0.9116  3.1191 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   4.8109     0.1213   39.65   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 1.329 on 119 degrees of freedom
+residuals_a <- residuals(linear_model_a)
+residuals_b <- residuals(linear_model_b)
+
+# QQ plot for Group A
+qqnorm(residuals_a, main = "QQ Plot for Group A Residuals")
+qqline(residuals_a, col = "maroon1")
+
+a0_a <- coef(linear_model_a)
+text(0.5, -1, paste("Line of best fit (Group A): y =", round(a0_a, 2)), adj = c(0, 0))
+
+
+# QQ plot for Group B
+qqnorm(residuals_b, main = "QQ Plot for Group B Residuals")
+qqline(residuals_b, col = "purple")
+
+a0_b <- coef(linear_model_b)
+text(0.2, -1.0, paste("Line of best fit (Group B): y =", round(a0_b, 2)), adj = c(0, 0))
+
+
+# SST for Group A and Group B 
+SST_a <- sum((group_a_data$hours_watched - mean(group_a_data$hours_watched))^2)
+SST_b <- sum((group_b_data$hours_watched - mean(group_b_data$hours_watched))^2)
+
+# SSR for Group A and Group B  
+SSR_a <- sum(residuals(linear_model_a)^2)
+SSR_b <- sum(residuals(linear_model_b)^2)
+
+# R-squared for Group A and Group B
+R_squared_a <- 1 - (SSR_a / SST_a)
+R_squared_b <- 1 - (SSR_b / SST_b)
+
+print(round(R_squared_a))
+## [1] 0
+print(R_squared_b)
+## [1] 0
+
+
+Multiple linear regression analysis:
+multiple_linear <- lm(hours_watched ~ age + social_metric + group, data = streaming_df)
+
+summary(multiple_linear)
+## 
+## Call:
+## lm(formula = hours_watched ~ age + social_metric + group, data = streaming_df)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -3.6190 -0.6450 -0.0171  0.6924  2.7963 
+## 
+## Coefficients:
+##                  Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      6.465843   0.179546  36.012  < 2e-16 ***
+## age             -0.072441   0.003096 -23.399  < 2e-16 ***
+## social_metric1   0.052169   0.167680   0.311 0.755774    
+## social_metric2   0.325942   0.169511   1.923 0.054787 .  
+## social_metric3   0.356707   0.171681   2.078 0.037992 *  
+## social_metric4   0.352033   0.167559   2.101 0.035898 *  
+## social_metric5   0.544026   0.175721   3.096 0.002017 ** 
+## social_metric6   0.574451   0.174595   3.290 0.001037 ** 
+## social_metric7   0.662007   0.175921   3.763 0.000178 ***
+## social_metric8   0.733418   0.166856   4.396 1.22e-05 ***
+## social_metric9   0.985375   0.171355   5.750 1.19e-08 ***
+## social_metric10  0.903445   0.196393   4.600 4.77e-06 ***
+## groupB           0.645560   0.101601   6.354 3.20e-10 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 1.036 on 987 degrees of freedom
+## Multiple R-squared:  0.4029, Adjusted R-squared:  0.3957 
+## F-statistic: 55.51 on 12 and 987 DF,  p-value: < 2.2e-16
+# multiple linear regression models for each group
+multiple_linear_a <- lm(hours_watched ~ age + social_metric, data = group_a_data)
+multiple_linear_b <- lm(hours_watched ~ age + social_metric, data = group_b_data)
+
+# QQ plot for Group A
+residuals_multilinear_a <- residuals(multiple_linear_a)
+qqnorm(residuals_multilinear_a, main = "QQ plot for Group A")
+qqline(residuals_multilinear_a, col = "red")
+abline(0, 1, col = "blue")
+
+# R-squared for Group A
+r_squared_multilinear_a <- summary(multiple_linear_a)$r.squared
+text(-1, 2, paste("R-squared (Group A) =", round(r_squared_multilinear_a, 4)))
+
+# Line of best fit equation for Group A
+coefficients_multilinear_a <- coefficients(multiple_linear_a)
+equation_a <- paste("y =", round(coefficients_multilinear_a[1], 4))
+text(-2, 1.5, labels = equation_a, cex = 1)
+
+
+# QQ plot for Group B
+residuals_multilinear_b <- residuals(multiple_linear_b)
+qqnorm(residuals_multilinear_b, main = "QQ plot for Group B")
+qqline(residuals_multilinear_b, col = "red")
+abline(0, 1, col = "blue")
+
+# R-squared for Group B
+r_squared_multilinear_b <- summary(multiple_linear_b)$r.squared
+text(-1, 2, paste("R-squared (Group B) =", round(r_squared_multilinear_b, 4)))
+
+# Line of best fit equation for Group B
+coefficients_multilinear_b <- coefficients(multiple_linear_b)
+equation_b <- paste("y =", round(coefficients_multilinear_b[1], 4))
+text(-1.5, 1.5, labels = equation_b, cex = 1)
+
+
+
+
+
+3D multidimensional visualisation of age, social metric, and hours watched:
+library(plotly)
+## 
+## Attaching package: 'plotly'
+## The following object is masked from 'package:MASS':
+## 
+##     select
+## The following object is masked from 'package:ggplot2':
+## 
+##     last_plot
+## The following object is masked from 'package:stats':
+## 
+##     filter
+## The following object is masked from 'package:graphics':
+## 
+##     layout
+# 3D multidimensional scatter plot
+scatter_3d <- plot_ly(data = streaming_df, x = ~age, y = ~social_metric, z = ~hours_watched, 
+                      type = "scatter3d", mode = "markers", marker = list(size = 4, color = ~hours_watched))
+
+scatter_3d <- scatter_3d %>% layout(
+  scene = list(xaxis = list(title = "Age"),
+               yaxis = list(title = "Social Metric"),
+               zaxis = list(title = "Hours Watched")),
+  title = "3D multidimensional scatter plot for the multiple linear regression analysis")
+
+scatter_3d
+A/B testing
+# t-test for a/b testing
+t_test <- t.test(group_a_data$hours_watched, group_b_data$hours_watched, var.equal = TRUE)
+
+print(t_test)
+## 
+##  Two Sample t-test
+## 
+## data:  group_a_data$hours_watched and group_b_data$hours_watched
+## t = -3.6825, df = 998, p-value = 0.0002434
+## alternative hypothesis: true difference in means is not equal to 0
+## 95 percent confidence interval:
+##  -0.7277371 -0.2217629
+## sample estimates:
+## mean of x mean of y 
+##  4.336125  4.810875
+alpha <- 0.05
+
+if (t_test$p.value < alpha) {
+  cat("Reject the null hypothesis: There is a statistically significant difference in user engagement between Group A and Group B.\n")
+} else {
+  cat("Fail to reject the null hypothesis: There is no statistically significant difference in user engagement between Group A and Group B.\n")
+}
+## Reject the null hypothesis: There is a statistically significant difference in user engagement between Group A and Group B.
