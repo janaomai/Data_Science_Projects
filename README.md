@@ -14,7 +14,7 @@ Each folder contains the code, relevant documentation, and resources for a speci
    
 *R*
 
-4. **Data Analysis: New Streaming Engine Algorithm**
+4. **Data Analysis - New Streaming Engine Algorithm**
 5. **Dashboard using Shiny Apps - Global Drug Mortality Rates**
 6. **Pre-processing Data - Video Games Sales**
 7. **Pre-processing Synthetic Data - Mitsubishi Motors**
