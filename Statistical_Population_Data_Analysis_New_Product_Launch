@@ -1,0 +1,305 @@
+---
+title: "Statistical Data Analysis Project"
+author: "Jana Omaiche"
+subtitle: 'Assignment 1'
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  html_notebook: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+
+### **Setup**
+
+The following packages will be loaded to help produce the analysis: 
+
+```{r, echo = TRUE, warnings = FALSE}
+library(dplyr) # Data manipulation
+library(ggplot2) # Building data visualisations
+library(knitr) # Generating reports in different formats
+library(readr) # Reading csv files
+library(magrittr) # Forward pipe operator
+```
+
+
+Importing & reading the dataset:
+
+```{r}
+population_df <- read.csv("D:/pop_dataset.csv")
+```
+
+
+### **Task 1**
+
+Some of the data's descriptive statistics will be analysed in the first task. The dimensions are shown as 56,000 observations (rows), and 4 variables (columns) by using the dim() function. The str() function is used to identify the variable structures. 
+
+* **Variable descriptions:**
+  + Region (ID name for regions [character])
+  + Age (Age in years [integer])
+  + Gender (Male = M, or Female = F [character])
+  + Population (Total amount of people [integer])
+
+The mean age of all people in the dataset, as well as the standard deviation of all people will be found using mean() and sd() functions. The round() function will also be added beforehand to round the number up to the nearest whole value, this is done because there can not be fractions of a person.  
+
+```{r}
+dim(population_df)
+str(population_df)
+```
+
+
+```{r}
+# Mean age of all people
+mean_age <- sum(population_df$age * population_df$population) / sum(population_df$population)
+
+print(round(mean_age))
+
+# Standard deviation of all people
+sd_population <- round(sd(population_df$population))
+
+print(sd_population)
+```
+The mean age of all people is 28, and the standard deviation of all people is 39.
+
+### **Task 2**
+
+The mean, standard deviation, minimum, first quartile, median, third quartile, maximum, and interquartile range will be produced using the summarise() function. It will be grouped by population and region, then summarised by age. The first 6 rows of the summary statistics will be printed using print(head()). The ggplot function will be used with geom_histogram() to create a histogram of the distribution of region means and considering only the mean age for each region.
+
+```{r}
+# Calculate mean age for each region
+region_summary <- population_df %>%
+  group_by(region) %>%
+  summarise(Mean_Age = sum(age * population) / sum(population), Total_Population = sum(population))
+
+# Calculate summary statistics for the mean age
+summary_stats <- region_summary %>%
+  group_by(region) %>%
+  summarise(
+    Min = min(Mean_Age, na.rm = TRUE),
+    Q1 = quantile(Mean_Age, probs = 0.25, na.rm = TRUE),
+    Median = median(Mean_Age, na.rm = TRUE),
+    Q3 = quantile(Mean_Age, probs = 0.75, na.rm = TRUE),
+    Max = max(Mean_Age, na.rm = TRUE),
+    Mean = mean(Mean_Age, na.rm = TRUE),
+    SD = sd(Mean_Age, na.rm = TRUE),
+    IQR = Q3 - Q1)
+
+# Print summary statistics
+print(head(summary_stats))
+
+# Create a histogram of the distribution of weighted mean ages
+ggplot(region_summary, aes(x = Mean_Age)) +
+  geom_histogram(binwidth = 1, fill = "seagreen1", color = "black") +
+  labs(title = "Histogram of Mean Ages by Region", x = "Mean Age", y = "Frequency")
+
+```
+
+The histogram of the region mean ages exhibits a normal distribution due to it's bell-shaped curve. There is no skewness in the region means which also further justifies a normal distribution, as the skewness is close to 0, it is indicating symmetry. 
+
+
+### **Task 3**
+
+The total population size for each region will be produced using the pipe operator to group by region and summarise the total population sizes. The population sizes for each region will then be arranged by descending order using the arrange(desc()) function and assigned to 'descending population'. The top 6 regions with the highest populations will then be printed in descending order.
+
+```{r}
+# Combining population sizes for each region
+population_size <- population_df %>%
+  group_by(region) %>% 
+  summarise(total_population = sum(population, na.rm = TRUE))
+
+# Arranging population sizes in descending order
+descending_population <- population_size %>%
+  arrange(desc(total_population))
+
+# Printing first 6 rows of regions with highest populations
+print(head(descending_population))
+
+```
+The region with the largest population size is region SSC22015, with a total population of 37948. In comparison with the second highest population size (SSC21671), it differs by 14,969 people. 
+
+
+```{r}
+# Filtering data for only the largest population (SSC22015)
+largest_region <- population_df %>% filter(region == "SSC22015")
+
+# Summary statistics for SSC22015
+SSC22015_age_summary_stats <- summary(largest_region$age)
+
+# Printing summary statistics for SSC22015
+print(SSC22015_age_summary_stats)
+cat("IQR:", IQR(largest_region$age))
+
+# Grouping by age and calculating total population sizes for each age group
+age_group_population <- largest_region %>%
+  group_by(age) %>%
+  summarise(Total_Population = sum(population))
+
+# Create a histogram of age distribution in SSC22015 (Largest Region)
+ggplot(age_group_population, aes(x = age, y = Total_Population)) +
+  geom_bar(stat = "identity", fill = "purple", color = "black") +
+  labs(title = "Histogram of largest region (SSC22015) population size for each age group", x = "Age", y = "Total Population")
+
+```
+
+The age distribution for the histogram of largest region shows a bimodal distribution as there are two data values that have the highest frequencies. When compared to the histogram for the mean ages for all regions, there is an extra peak in the distribution. The histogram in task 2 was a normal distribution with a bell-shaped curve, however, the histogram in task 3 has two curves. 
+
+
+```{r}
+# Distribution of age for males in the largest region
+males_data <- largest_region %>% filter(gender == "M")
+
+age_population_summary <- males_data %>%
+  group_by(age) %>%
+  summarise(Total_Population = sum(population))
+
+ggplot(age_population_summary, aes(x = age, y = Total_Population)) +
+  geom_bar(stat = "identity", fill = "lightskyblue", color = "black") +
+  labs(title = "Histogram of Ages for Males in SSC22015", x = "Age", y = "Frequency")
+
+
+# Distribution of age for females in the largest region
+females_data <- largest_region %>% filter(gender == "F")
+
+age_population_summary <- females_data %>%
+  group_by(age) %>%
+  summarise(total_population = sum(population))
+
+ggplot(age_population_summary, aes(x = age, y = total_population)) +
+  geom_bar(stat = "identity", fill = "violet", color = "black") +
+  labs(title = "Histogram of Ages for Females in SSC22015", x = "Age", y = "Frequency")
+
+```
+
+Both the histograms for males and females in the "SSC22015" region display bimodal distributions, indicating the presence of two distinct age groups with higher population sizes. The histogram for females shows a larger population size overall, suggesting that there are specific age groups within the female population which are more prominent. 
+
+### **Task 4**
+
+```{r}
+# Calculating the ratio of older to younger people in all regions
+region_age_ratio <- population_df %>%
+  mutate(age_group = ifelse(age < 40, "Younger", "Older")) %>%
+  group_by(region) %>%
+  summarise(
+    younger_population = sum(population[age_group == "Younger"], na.rm = TRUE),
+    older_population = sum(population[age_group == "Older"], na.rm = TRUE),
+    total_population = sum(population, na.rm = TRUE),
+    ratio = older_population / younger_population)
+
+print(head(region_age_ratio))
+
+# Creating a pie chart for the older/younger ratio in all regions
+age_population_values <- c(Younger = sum(region_age_ratio$younger_population, na.rm = TRUE),
+                           Older = sum(region_age_ratio$older_population, na.rm = TRUE))
+
+pie(age_population_values, labels = names(age_population_values), col = c("rosybrown1", "rosybrown"), main = "Ratio of younger people (<40) to older people (>=40) in all regions")
+
+# Adding a legend to the pie chart
+legend_colours <- c("Younger" = "rosybrown1", "Older" = "rosybrown")
+legend("topright",  
+  legend = names(age_population_values),
+  fill = legend_colours,  
+  title = "Age group")
+
+```
+
+The first 6 rows of the calculated ratio of male and females for each gender is printed. When observing the data in the pie chart visualisation, there is an increased amount of younger people when compared to older people in the dataset for all regions.
+
+
+### **Task 5**
+
+```{r}
+# Calculating the ratio of males and females in all regions
+region_gender_ratio <- population_df %>%
+  mutate(genders = case_when(gender == "M" ~ "Male", gender == "F" ~ "Female")) %>%
+  group_by(region) %>%
+  summarise(
+    male_population = sum(population[genders == "Male"], na.rm = TRUE),
+    female_population = sum(population[genders == "Female"], na.rm = TRUE),
+    total_population = sum(population, na.rm = TRUE),
+    ratio = male_population / female_population)
+
+print(head(region_gender_ratio))
+
+# Creating a pie chart for the male/female ratio in all regions
+gender_population_values <- c(Male = sum(region_gender_ratio$male_population, na.rm = TRUE),
+                           Female = sum(region_gender_ratio$female_population, na.rm = TRUE))
+
+pie(gender_population_values, labels = names(gender_population_values), col = c("royalblue1", "hotpink1"), main = "Ratio of males and females in all regions")
+
+# Adding a legend to the pie chart
+legend_colours <- c(Male = "royalblue1", Female = "hotpink1")
+legend("topright",  
+  legend = names(gender_population_values),
+  fill = legend_colours,  
+  title = "Gender")
+
+```
+
+The pie chart for gender ratios shows that it is very close to being 50% males and 50% females. All of the ratios produced for each region are close to 1, meaning there is an equal distribution of both genders in the dataset. 
+
+### **Task 6**
+
+The primary target market for the new energy drink will be males in the age group of 18-22 years old. The gender is chosen at random because it's 50:50. The age group is chosen based on the popularity of buying energy drinks for this range age. There are more people in this age range that would purchase energy drinks due to reasons such as studying in school/university and competing in sports, whereas there are less older people who are studying and playing sports. 
+
+```{r}
+# Filtering the dataset for males in age groups 18-22
+targeted_data <- population_df %>%
+  filter(gender == "M", age >= 18, age <= 22)
+
+# Grouping the targeted data by region and calculating the total population
+region_populations <- targeted_data %>%
+  group_by(region) %>%
+  summarise(total_population = sum(population, na.rm = TRUE))
+
+# Arranging regions with the highest populations of the targeted data in descending order
+highest_population_regions <- region_populations %>%
+  arrange(desc(total_population))
+
+print(head(highest_population_regions))
+```
+
+The two regions I would choose are regions SSC20492 and SSC22015 as they have the largest population of males aged 18 to 22 years old.
+
+
+The calculation below shows believing that 15% of the primary target market in the region will attend the launch, the number of the primary target market to attend in each region is estimated.
+
+```{r}
+# Filtering the dataset for males aged 18-22 in SSC22015 and SSC20492 regions
+primary_target_market_data <- population_df %>%
+  filter(gender == "M", age >= 18, age <= 22, region %in% c("SSC22015", "SSC20492"))
+
+# Calculating the total population of males aged 18-22 in SSC22015 and SSC20492 regions
+target_market_population <- primary_target_market_data %>%
+  group_by(region) %>%
+  summarise(total_population = sum(population, na.rm = TRUE))
+
+# Assuming 15% attendance: the number of attendees for each region
+target_market_population$number_of_attendees <- round(target_market_population$total_population * 0.15)
+
+# Print the estimated attendance for each region
+print(target_market_population)
+
+```
+
+The estimate number of the primary targeted market who will attend the launch (based on believing 15% will definitely attend) is 347 people for SSC20492 region, and 204 people for the SSC22015 region. This was calculated by multiplying the total population of the filtered data by 15% (0.15).
+
+
+The calculation below shows the estimate of the likelihood that at least 30% of the primary target market will attend in each region using a normal distribution as the sample sizes exceed the minimum sample size of 30 people.
+
+```{r}
+# Calculating the likelihood that at least 30% of the primary target market will attend in both regions using pnorm
+mean_target <- mean(target_market_population$total_population)
+sd_target <- sd(target_market_population$total_population)
+x <- 0.30
+
+target_market_population$likelihood_attendance_probability <- pnorm(x, mean_target, sd_target, lower.tail = FALSE)
+
+print(target_market_population)
+```
+
+The pnorm(x, mean, standard deviation, lower.tail = FALSE) function was used to calculate the likelihood that at least 30% of the targeted market would attend in both regions. The lower.tail = FALSE is used because the cumulative probability is calculated for variables which have at least more than 30% attendance, which is also stated as P(X > x). The pnorm function is used because the minimum sample size of 30 is well exceeded and the age population is normally distributed. Therefore the probability that at least 30% of the primary target market will attend is 0.99 for both regions. Because the value is very close to 1, this means that there is almost 100% chance of it occurring.
