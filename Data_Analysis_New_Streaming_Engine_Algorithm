@@ -19,7 +19,7 @@ library(pwr, quietly = TRUE) # A/B testing
 
 Reading/importing the data:
 # reading/importing dataset
-streaming_df <- read.csv("D:/RMIT/MATH2406/streaming_data.csv")
+streaming_df <- read.csv("D:/streaming_data.csv")
 
 # dimensions of df
 dim(streaming_df)
