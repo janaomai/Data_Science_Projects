@@ -1,0 +1,440 @@
+# %% [markdown]
+# # **Revolution Consulting - Machine Learning Modelling**
+# ### **Connect5G Networks: Spam detection**
+# #### Jana Omaiche
+
+# %% [markdown]
+# #### **Importing Libraries:**
+
+# %%
+import pandas as pd # data manipulation
+import numpy as np # numerical computations
+import matplotlib.pyplot as plt # data visualisations
+import seaborn as sns # enhanced visualisations
+import re # regular expressions
+import ssl # secure socket layer connections
+import nltk # natural language toolkit
+import time # time
+from nltk.corpus import stopwords # stopwords corpus
+from nltk.tokenize import word_tokenize # tokenisation
+from nltk.stem import WordNetLemmatizer # Lemmatisation
+from sklearn.feature_extraction.text import CountVectorizer # converting text into matric of token counts
+from sklearn.neighbors import KNeighborsClassifier # k-nearest neighbours
+from sklearn.tree import DecisionTreeClassifier # decision trees
+from sklearn.model_selection import train_test_split # splitting dataset into training and testing 
+from sklearn.model_selection import GridSearchCV # hyperparameter tuning vis cross-validation
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix, ConfusionMatrixDisplay  # calculating accuracy tools & visualising matrix
+from imblearn.over_sampling import SMOTE # syhnthetic minority over-sampling technique (handling imbalance)
+from collections import Counter
+from sklearn.metrics import classification_report, accuracy_score
+
+# %% [markdown]
+# #### **Loading Dataset:**
+
+# %%
+# Loading dataset
+sms_df = pd.read_csv('A3_sms.csv', usecols = lambda column: column not in ['Unnamed: 0', 'Unnamed: 3'] )
+
+print(sms_df.head())
+
+# %% [markdown]
+# #### **Cleaning Dataset:**
+
+# %% [markdown]
+# Checking data types:
+
+# %%
+# Data types in dataset
+sms_df.dtypes
+
+# %% [markdown]
+# Converting string to integer to prepare for data modelling:
+
+# %%
+# Converting data type (string to integer)
+sms_df['spam'] = sms_df['spam'].astype(int)
+
+# %% [markdown]
+# Checking for missing data:
+
+# %%
+# Missing values
+missing_data = sms_df.isnull().sum()
+print(missing_data)
+
+# %% [markdown]
+# Checking unique values in spam column:
+
+# %%
+# Unique values
+print(sms_df['spam'].unique())
+
+# %% [markdown]
+# Converting text to lower-case:
+
+# %%
+# Converting sms texts to lowercase
+sms_df['sms'] = sms_df['sms'].str.lower()
+print(sms_df.head())
+
+# %% [markdown]
+# #### **Exploratory Data Analysis:**
+
+# %% [markdown]
+# Checking data is balanced:
+
+# %%
+# Defining class counts
+class_counts = sms_df['spam'].value_counts()
+print(class_counts)
+
+# Plotting pie chart for ham and spam proportions
+pie_labels = ["Ham", "Spam"]
+pie_colours = ["#539ED8", "#FF9F1E"]
+
+plt.pie(class_counts, labels = None, autopct = '%1.1f%%', startangle = 90, textprops = {'fontsize': 12}, colors = pie_colours)
+plt.legend(labels = pie_labels , bbox_to_anchor = (1, 0.5), fontsize = 12, loc = 'center left', title = "Class count:", title_fontsize = 12)
+plt.title(f'Pie chart of proportion of Spam or Ham messages', fontsize = 13)
+plt.grid(True, linewidth = 0.5)
+
+plt.show
+
+# %% [markdown]
+# Extracting features using count vectorizer:
+
+# %%
+# Applying Count Vectorizer
+vectorizer = CountVectorizer()
+x = vectorizer.fit_transform(sms_df['sms'])
+print(x.shape)
+
+# %% [markdown]
+# There are 5351 text messages, and 8280 unique words (tokens).
+
+# %% [markdown]
+# Removing stopwords:
+
+# %%
+# Importing stopwords
+from nltk.corpus import stopwords as nltk_stopwords
+
+stopwords_list = nltk_stopwords.words('english')
+vectorizer = CountVectorizer(stop_words = stopwords_list)
+stopwords_vectorized = vectorizer.fit_transform(sms_df['sms'])
+
+print(stopwords_vectorized.shape)
+
+
+# %% [markdown]
+# After removing stopwords, there are now 8145 unique words (tokens).
+
+# %% [markdown]
+# Identifying common spam and ham words in SMS messages:
+
+# %%
+# Defining spam and ham as numerical values
+spam = sms_df[sms_df['spam'] == 1]['sms']
+ham = sms_df[sms_df['spam'] == 0]['sms']
+
+# Counting words
+def count_words(messages):
+    words = ' '.join(messages).split()
+    return Counter(words)
+
+spam_word_counts = count_words(spam)
+ham_word_counts = count_words(ham)
+
+# Printing most common word counts for spam and ham
+print(spam_word_counts.most_common)
+print(ham_word_counts.most_common)
+
+# %% [markdown]
+# Proportion of spam messages:
+
+# %%
+# Proportion of spam sms
+proportion_spam = len(spam) / (len(spam) + len(ham)) * 100
+
+print(proportion_spam)
+
+# %% [markdown]
+# There proportion of spam messages in the cleaned dataset is 13.16%.
+
+# %% [markdown]
+# #### **Data Modelling:**
+
+# %% [markdown]
+# Splitting into training and test sets:
+
+# %%
+# Splitting features (X) and variable (y)
+X = sms_df['sms']
+y = sms_df['spam']
+
+# Splitting the data into training and test sets (80% train, 20% test)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 123)
+
+print("Training set shape:", X_train.shape)
+print("Test set shape:", X_test.shape)
+
+# %% [markdown]
+# Balancing the training dataset using SMOTE:
+
+# %%
+# Initialising CountVectorizer
+vectorizer = CountVectorizer()
+
+# Fiting & transforming the training and test data
+X_train_vectorized = vectorizer.fit_transform(X_train)
+X_test_vectorized = vectorizer.transform(X_test)
+
+# Initialising SMOTE
+smote = SMOTE(random_state = 123)
+
+# Applying SMOTE to balance the training dataset
+X_train_balanced, y_train_balanced = smote.fit_resample(X_train_vectorized, y_train)
+
+# %% [markdown]
+# **KNN:**
+
+# %% [markdown]
+# KNN without SMOTE:
+
+# %%
+# Defining KNN model
+knn = KNeighborsClassifier()
+
+# Training and evaluating KNN model without SMOTE
+start_time = time.time()
+knn.fit(X_train_vectorized, y_train)
+knn_pred = knn.predict(X_test_vectorized)
+knn_accuracy = accuracy_score(y_test, knn_pred)
+knn_balanced_accuracy = balanced_accuracy_score(y_test, knn_pred)
+training_time_knn = time.time() - start_time
+prediction_time_knn = 0 
+
+
+print("KNN Accuracy:", knn_accuracy)
+print("KNN Balanced Accuracy:", knn_balanced_accuracy)
+print("KNN Training Time:", training_time_knn)
+print("KNN Prediction Time:", prediction_time_knn)
+
+# %% [markdown]
+# KNN with SMOTE:
+
+# %%
+# Defining KNN mdoel
+knn = KNeighborsClassifier() 
+
+# Defining hyperparameter grid
+knn_param_grid = {
+    'n_neighbors': [3, 5, 7],
+    'weights': ['uniform', 'distance'],
+    'metric': ['euclidean', 'manhattan']}
+
+# Performing GridSearchCV
+knn_grid = GridSearchCV(knn, knn_param_grid, scoring = 'accuracy', cv = 5)
+knn_grid.fit(X_train_balanced, y_train_balanced)
+
+# Obtaining best parameters
+best_knn_params_smote = knn_grid.best_params_
+
+# Fitting model with best parameter
+knn_best_smote = KNeighborsClassifier(**best_knn_params_smote)
+knn_best_smote.fit(X_train_balanced, y_train_balanced)
+
+# Predicting using model
+knn_pred_smote = knn_best_smote.predict(X_test_vectorized)
+
+# Evaluating model
+knn_accuracy_smote = accuracy_score(y_test, knn_pred_smote)
+
+print("KNN Accuracy:", knn_accuracy_smote)
+print("\nKNN Classification Report (SMOTE):")
+print(classification_report(y_test, knn_pred_smote))
+
+# %% [markdown]
+# **Decision Tree:**
+
+# %% [markdown]
+# Decision tree without SMOTE:
+
+# %%
+# Defining decision tree model
+dt = DecisionTreeClassifier()
+
+# Training and evaluating decision tree model without SMOTE
+start_time = time.time()
+dt.fit(X_train_vectorized, y_train)
+dt_pred = dt.predict(X_test_vectorized)
+dt_accuracy = accuracy_score(y_test, dt_pred)
+dt_balanced_accuracy = balanced_accuracy_score(y_test, dt_pred)
+training_time_dt = time.time() - start_time
+prediction_time_dt = 0  
+
+print("\nDecision Tree Accuracy:", dt_accuracy)
+print("Decision Tree Balanced Accuracy:", dt_balanced_accuracy)
+print("Decision Tree Training Time:", training_time_dt)
+print("Decision Tree Prediction Time:", prediction_time_dt)
+
+
+# %% [markdown]
+# Decision tree with SMOTE:
+
+# %%
+# Defining decision tree model
+dt = DecisionTreeClassifier()
+
+# Defining hyperparameter grid
+dt_param_grid = {
+    'max_depth': [3, 5, 7, 10],
+    'criterion': ['gini', 'entropy'],
+    'min_samples_split': [2, 5, 10]}
+
+# Performing GridSearchCV
+dt_grid = GridSearchCV(dt, dt_param_grid, scoring='accuracy', cv=5)
+dt_grid.fit(X_train_balanced, y_train_balanced)
+
+# Obtaining best parameters
+best_dt_params_smote = dt_grid.best_params_
+
+# Fitting model with best parameter
+dt_best_smote = DecisionTreeClassifier(**best_dt_params_smote)
+dt_best_smote.fit(X_train_balanced, y_train_balanced)
+
+# Predicting using model
+dt_pred_smote = dt_best_smote.predict(X_test_vectorized)
+
+# Evaluating model
+dt_accuracy_smote = accuracy_score(y_test, dt_pred_smote)
+
+print("Decision Tree Accuracy:", dt_accuracy_smote)
+print("\nDecision Tree Classification Report:")
+print(classification_report(y_test, dt_pred_smote))
+
+# %% [markdown]
+# Calculating prediction times for both models with SMOTE:
+
+# %%
+# Measuring prediction time for KNN with SMOTE
+start_time_knn_smote = time.time()
+knn_pred_smote = knn_best_smote.predict(X_test_vectorized)
+end_time_knn_smote = time.time()
+prediction_time_knn_smote = end_time_knn_smote - start_time_knn_smote
+
+# Measuring prediction time for decision tree with SMOTE
+start_time_dt_smote = time.time()
+dt_pred_smote = dt_best_smote.predict(X_test_vectorized)
+end_time_dt_smote = time.time()
+prediction_time_dt_smote = end_time_dt_smote - start_time_dt_smote
+
+print("Prediction time for KNN with SMOTE:", prediction_time_knn_smote)
+print("Prediction time for Decision Tree with SMOTE:", prediction_time_dt_smote)
+
+
+# %% [markdown]
+# Calculating accuracy and balanced accuracy for both models with SMOTE:
+
+# %%
+# Calculating accuracy
+knn_accuracy_smote = accuracy_score(y_test, knn_pred_smote)
+dt_accuracy_smote = accuracy_score(y_test, dt_pred_smote)
+
+# Calculating balanced accuracy
+knn_balanced_accuracy_smote = balanced_accuracy_score(y_test, knn_pred_smote)
+dt_balanced_accuracy_smote = balanced_accuracy_score(y_test, dt_pred_smote)
+
+# Creating a dictionary to hold the metrics
+metrics_smote = {
+    "Model": ["KNN", "Decision Tree"],
+    "Accuracy": [knn_accuracy_smote, dt_accuracy_smote],
+    "Balanced Accuracy": [knn_balanced_accuracy_smote, dt_balanced_accuracy_smote],
+    "Prediction Time": [prediction_time_knn_smote, prediction_time_dt_smote]}
+
+# Convert dictionary to a dataframe
+metrics_df_with_smote = pd.DataFrame(metrics_smote)
+
+# Print metrics with smote
+print(metrics_df_with_smote)
+
+# %% [markdown]
+# Plotting models for comparison of accuracy, balanced accuracy, and prediction times:
+
+# %%
+# Models and metrics without SMOTE
+models = ["KNN", "Decision Tree"]
+accuracy_no_smote = [knn_accuracy, dt_accuracy]
+balanced_accuracy_no_smote = [knn_balanced_accuracy, dt_balanced_accuracy]
+
+# Width of the bars
+bar_width = 0.35
+
+# X-coordinates for the bars
+r1 = np.arange(len(models))
+
+# Plotting accuracy comparison without SMOTE
+plt.figure(figsize = (10, 6))
+plt.bar(r1, accuracy_no_smote, color = '#95D800', width = bar_width, edgecolor = '#55595D', label = 'Accuracy (No SMOTE)')
+plt.bar(r1 + bar_width, balanced_accuracy_no_smote, color = '#9E54D3', width = bar_width, edgecolor = '#55595D', label = 'Balanced Accuracy (No SMOTE)')
+
+plt.grid(True, linewidth = 0.2)
+
+plt.xlabel('Model', fontweight = 'bold')
+plt.xticks(r1 + bar_width / 2, models)
+plt.ylabel('Score')
+plt.title('Accuracy and Balanced Accuracy Comparison without SMOTE')
+plt.legend(title = "Metrics:")
+plt.legend(loc = 'center left', bbox_to_anchor = (1, 0.5))
+
+plt.show()
+
+
+
+# %%
+# Models and metrics with SMOTE
+accuracy_with_smote = [knn_accuracy_smote, dt_accuracy_smote]
+balanced_accuracy_with_smote = [knn_balanced_accuracy_smote, dt_balanced_accuracy_smote]
+
+# Plotting accuracy comparison with SMOTE
+plt.figure(figsize = (10, 6))
+plt.bar(r1, accuracy_with_smote, color = '#FFCA00', width = bar_width, edgecolor = '#55595D', label = 'Accuracy (SMOTE)')
+plt.bar(r1 + bar_width, balanced_accuracy_with_smote, color = '#EE5296', width = bar_width, edgecolor = '#55595D', label = 'Balanced Accuracy (SMOTE)')
+
+plt.grid(True, linewidth = 0.2)
+
+plt.xlabel('Model', fontweight = 'bold')
+plt.xticks(r1 + bar_width / 2, models)
+plt.ylabel('Score')
+plt.title('Accuracy and Balanced Accuracy Comparison with SMOTE')
+plt.legend(title = "Metrics:")
+plt.legend(loc = 'center left', bbox_to_anchor = (1, 0.5))
+
+plt.ylim(0, 1.0)
+
+plt.show()
+
+# %%
+# Prediction times without SMOTE
+prediction_time_no_smote = [prediction_time_knn, prediction_time_dt]
+
+# Prediction times with SMOTE
+prediction_time_with_smote = [prediction_time_knn_smote, prediction_time_dt_smote]
+
+# Plotting prediction time comparison
+plt.figure(figsize = (10, 6))
+bar_width = 0.35
+r1 = np.arange(len(models))
+plt.grid(True, linewidth = 0.2)
+
+plt.bar(r1, prediction_time_no_smote, color = 'orange', width = bar_width, label = 'No SMOTE')
+plt.bar(r1 + bar_width, prediction_time_with_smote, color = 'red', width = bar_width, label = 'SMOTE')
+
+plt.xlabel('Model', fontweight = 'bold')
+plt.xticks(r1 + bar_width / 2, models)
+plt.ylabel('Prediction Time (seconds)')
+plt.title('Prediction Time Comparison with and without SMOTE')
+plt.legend(loc = 'center left', bbox_to_anchor = (1, 0.5))
+
+plt.show()
+
+
