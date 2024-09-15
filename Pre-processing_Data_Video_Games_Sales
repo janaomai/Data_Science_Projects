@@ -74,7 +74,7 @@ The website URL of the video game sales dataset was sourced from https://www.kag
 library(readr)
 library(openxlsx)
 
-videogames_df <- read.xlsx("D:/RMIT/MATH2405/video_games.xlsx")
+videogames_df <- read.xlsx("D:/video_games.xlsx")
 
 ```
 
