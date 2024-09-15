@@ -1,0 +1,609 @@
+---
+title: "Creating and pre-processing synthetic data project: Mitsubishi Motors Sales"
+author: "Jana Omaiche"
+subtitle: "Assignment 2"
+output: 
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf: default
+---
+### **Introduction**
+
+This project will be creating and pre-processing synthetic data relevant to the Mitsubishi Motors company. Due to Mitsubishi Lancer Evolution's being discontinued as a model years ago, I'm interested to explore the sales of different vehicles by Mitsubishi and how many customers are satisfied with the newer produced vehicles, as opposed to the older car generations. Another interesting insight is the removal of manual cars by Mitsubishi, only automatic cars are produced now. There are positives and negatives throughout the evolving car sales history. Technology is improving aspects such as safety in newer vehicles, however the removal of manual transmissions causes the driver to be less involved, thus changing the experience of driving (Hancock et al. 2019). I am interested in exploring the data analytics behind Mitsubishi Motors from both an automotive enthusiast and data researcher perspective. 
+
+### **Setup:** 
+
+```{r}
+
+library(knitr) # Generating reports in different formats
+library(dplyr) # Data manipulations and summary statistics
+library(magrittr) # Forward pipe operator
+library(conflicted) # Avoiding conflict with dplyr functions
+library(outliers) # Scanning for outliers using z-scores
+
+```
+
+
+### **Data Description:** 
+
+* **Variable descriptions of dataset 1:**
+  + Model (model name of the vehicle)
+  + Colour (exterior colour of the vehicle)
+  + Body_type (SUV, 4WD, Ute)
+  + Engine_type (petrol, diesel, hybrid)
+  + Horsepower (power of the engine produced and measured in horsepower)
+  + Fuel_efficiency (approximate number of litres per 100 km)
+  + Price (cost of vehicle in AUD$)
+  + Customer name (name of the customers who own a Mitsubishi vehicle)
+
+* **Variable descriptions of dataset 2:**
+  + Customer_name (name of customers, including Japanese and English names)
+  + Customer_age (age of customer ranged between 20 and 70 years old)
+  + Customer_country (country of customer's location)
+  + Year of purchase (year that the vehicle was purchased by the customer)
+  + Customer_satisfaction (ratings of customer satisfaction from 1 to 5, where 1 = very unsatisfied, 2 = unsatisfied, 3 = neutral, 
+    4 = satisfied, 5 = very satisfied)
+  
+  
+### **Generating the synthetic datasets**
+
+**Step 1:** Setting the seed.
+
+A seed will need to generated in order to generate the same random set of values in the synthetic data set. To do this, the set.seed() function is used with an integer. The same integer will then be used to reproduce the same random values.
+<br>
+
+**Step 2:** Generating the data variables for dataset 1.
+
+The realistic data will be generated for each variable and collected from open sourced websites. The number of rows will be set as 70. The variables information was sourced from www.mitsubishicars.com.au for the vehicle descriptions (Mitsubishi 2023). The customer satisfaction is a correlated random data, as it is assumed when customer satisfaction is high, the number of sales increases too (Kelly 2021). The customers name will include a range of common Japanese and English names, including an even amount of female/male/unisex names. The names will be hard-coded as they are made up at random and are including common Japanese names as well. The car model names listed in the first dataset will only include all the currently available new vehicles for Australia, Canada, United States, England, and Japan. The price range for each vehicle varies as there are different ranges/series which may include extra options or features, therefore are priced higher (Mitsubishi 2023).
+
+* Dataset 1 includes variables of the vehicle sales details and the name of the customer who purchased each vehicle. 
+* Dataset 2 includes variables about all the customer's further details.  
+
+```{r}
+#Setting the seed for dataset 1
+set.seed(123)
+
+# Dataset 1: Vehicle information + customer name
+model_name <- c("Outlander", "Eclipse Cross", "Pajero Sport", "ASX", "Triton")
+colour <- c("Red", "Blue", "White", "Silver", "Grey", "Black")
+body_type <- c("SUV", "4WD", "Ute")
+engine_type <- c("Petrol", "Diesel", "Hybrid")
+horsepower <- c("181", "157", "133", "148", "178")
+fuel_efficiency <- c("8.1", "7.7", "8.0", "7.9", "8.6")
+price <- c(37000:70000, 31000:56000, 47000:65000, 28000:38000, 48000:66000)
+customer_name <- c("William", "Emily", "Jane", "Bob", "Fred", "Mia", "Dominic", "Brian", "Letty", "Charlotte", "Roman", "Amy", "Luke", "Emily", "James", "Benjamin", "Jason", "Jack", "Martin", "Sarah", "Jessica", "Jasmine", "Penelope", "Jacob", "Elizabeth", "Alexandra", "Isabella", "Tyler", "Donald", "Sophia", "Akira", "Chihiro", "Mei", "Yuki", "Kyo", "Tohru", "Hatsuharu", "Hiro", "Isuzu", "Ren", "Toshiro", "Sakura", "Misaki", "Takashi", "Kana", "Emiko", "Tatsuya", "Ryo", "Nanami", "Kazuya", "Saki", "Shiori", "Ami", "Nozomi", "Aiko", "Kenji", "Hana", "Aya", "Himari", "Ayame")
+
+  
+n_rows <- 70
+
+```
+<br>
+
+**Step 3:** Creating a data frame for dataset 1.
+
+The model name of the vehicles will be assigned to their corresponding options of body type, engine type, horsepower, fuel efficiency, and price (Mitsubishi 2023). The reasoning behind this is because some models are manufactured to only run on petrol/diesel for example, also not all vehicles are produced as hybrids (Mitsubishi 2023). The colour, body type, and engine types will be converted as factors. The horsepower and fuel efficiency variables will be converted as numerics. Using the sample() function allows R to randomly choose numbers/characters from the options listed above. The replace = TRUE parameter is used to allow that randomly sampled value to return to the pool of options afterwards. For example, if it was replace = FALSE for the colour variable, then that means if 'Red' was a randomly selected colour one time, it won't be able to be selected again as a colour value. 
+
+```{r} 
+
+#Dataset 1: vehicle information + customer names
+mitsubishi_df <-
+  data.frame(
+    Model = sample(model_name, n_rows, replace = TRUE),
+    Colour = sample(colour, n_rows, replace = TRUE),
+    Body_type = sample(body_type, n_rows, replace = TRUE),
+    Engine_type = sample(engine_type, n_rows, replace = TRUE),
+    Horsepower = sample(horsepower, n_rows, replace = TRUE),
+    Fuel_efficiency = sample(fuel_efficiency, n_rows, replace = TRUE),
+    Price = sample(price, n_rows, replace = TRUE),
+    Customer_name = sample(customer_name, n_rows, replace = TRUE)
+  )
+
+```
+
+```{r} 
+suppressWarnings({
+
+# Changing data types to factors or numerics
+mitsubishi_df$Colour <- as.factor(mitsubishi_df$Colour)
+mitsubishi_df$Body_type <- as.factor(mitsubishi_df$Body_type)
+mitsubishi_df$Engine_type <- as.factor(mitsubishi_df$Engine_type)
+mitsubishi_df$Horsepower <- as.numeric(mitsubishi_df$Horsepower)
+mitsubishi_df$Fuel_efficiency <- as.numeric(mitsubishi_df$Fuel_efficiency)
+
+# Assigning body type to car models
+mitsubishi_df$Body_type[mitsubishi_df$Model == "Outlander"] <- "SUV"
+mitsubishi_df$Body_type[mitsubishi_df$Model == "Eclipse Cross"] <- "SUV"
+mitsubishi_df$Body_type[mitsubishi_df$Model == "Pajero Sport"] <- "4WD"
+mitsubishi_df$Body_type[mitsubishi_df$Model == "ASX"] <- "SUV"
+mitsubishi_df$Body_type[mitsubishi_df$Model == "Triton"] <- "Ute"
+
+# Assigning available engine types to car models
+mitsubishi_df$Engine_type[mitsubishi_df$Model == "Outlander"] <- sample(c("Petrol", "Diesel"))
+mitsubishi_df$Engine_type[mitsubishi_df$Model == "Eclipse Cross"] <- sample(c("Petrol", "Hybrid"))
+mitsubishi_df$Engine_type[mitsubishi_df$Model == "Pajero Sport"] <- "Diesel"
+mitsubishi_df$Engine_type[mitsubishi_df$Model == "ASX"] <- "Petrol"
+mitsubishi_df$Engine_type[mitsubishi_df$Model == "Triton"] <- "Diesel"
+
+# Assigning horsepower to car models
+mitsubishi_df$Horsepower[mitsubishi_df$Model == "Outlander"] <- "181"
+mitsubishi_df$Horsepower[mitsubishi_df$Model == "Eclipse Cross"] <- "157"
+mitsubishi_df$Horsepower[mitsubishi_df$Model == "Pajero Sport"] <- "133"
+mitsubishi_df$Horsepower[mitsubishi_df$Model == "ASX"] <- "148"
+mitsubishi_df$Horsepower[mitsubishi_df$Model == "Triton"] <- "178"
+
+# Assigning fuel efficiency to car models
+mitsubishi_df$Fuel_efficiency[mitsubishi_df$Model == "Outlander"] <- "8.1"
+mitsubishi_df$Fuel_efficiency[mitsubishi_df$Model == "Eclipse Cross"] <- "7.7"
+mitsubishi_df$Fuel_efficiency[mitsubishi_df$Model == "Pajero Sport"] <- "8.0"
+mitsubishi_df$Fuel_efficiency[mitsubishi_df$Model == "ASX"] <- "7.9"
+mitsubishi_df$Fuel_efficiency[mitsubishi_df$Model == "Triton"] <- "8.6"
+
+# Assigning price to car models
+mitsubishi_df$Price[mitsubishi_df$Model == "Outlander"] <- sample(37000:70000, sum(mitsubishi_df$Model == "Outlander"), replace = TRUE)
+mitsubishi_df$Price[mitsubishi_df$Model == "Eclipse Cross"] <- sample(31000:56000, sum(mitsubishi_df$Model == "Eclipse Cross"), replace = TRUE)
+mitsubishi_df$Price[mitsubishi_df$Model == "Pajero Sport"] <- sample(47000:65000, sum(mitsubishi_df$Model == "Pajero Sport"), replace = TRUE)
+mitsubishi_df$Price[mitsubishi_df$Model == "ASX"] <- sample(28000:38000, sum(mitsubishi_df$Model == "ASX"), replace = TRUE)
+mitsubishi_df$Price[mitsubishi_df$Model == "Triton"] <- sample(48000:66000, sum(mitsubishi_df$Model == "Triton"), replace = TRUE)
+
+})
+```
+<br>
+
+```{r}
+print(head(mitsubishi_df))
+```
+
+<br>
+
+**Step 4:** Generating the data variables for dataset 2.
+
+Studies have shown that the ages for car ownership is between 20 and 70 years of age, therefore a random sampling for this age range will be set for the customer_age variable (Thakuriah 2010). Five countries with one of the highest populations of Mitsubishi vehicles will be listed as the customer_country variable (Mitsubishi 2023). Due to Mitsubishi Motors having a high customer satisfaction rate, the probability function (prob = ) will be included in this variable for accurate representation of the customers responses to the vehicle purchases (AW 2023).The customer satisfaction will have a probability set to 60% for 'very satisfied (5)', 0.33% for 'satisfied (4), 0.05% as 'neutral (3)', 0.01% as 'unsatisfied (2)', and 0.01% as 'very unsatisfied (1)'. This means that the sampling will occur based on the set probability levels. Therefore, there will be more people who purchase a Mitsubishi vehicle with high satisfaction levels compared to people who are unsatisfied. 
+
+```{r}
+
+#Set the seed for dataset 2
+set.seed(321)
+
+#Dataset 2: Customer information
+customer_age <- c(20:70)
+customer_country <- c("Japan", "Australia", "United States", "England", "Canada")
+customer_satisfaction <- c(1, 2, 3, 4, 5)
+
+n_rows <- 70
+
+```
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+**Step 5:** Creating a data frame for dataset 2.
+
+```{r}
+
+#Dataframe for dataset 2
+customer_df <-
+  data.frame(
+    Customer_name = mitsubishi_df$Customer_name,
+    Customer_age = sample(customer_age, n_rows, replace = TRUE),
+    Customer_country = sample(customer_country, n_rows, replace = TRUE),
+    Year_of_purchase = sample(2019:2023, n_rows, replace = TRUE),
+    Customer_satisfaction = sample(customer_satisfaction, n_rows, replace = TRUE, prob = c(0.01, 0.01, 0.05, 0.33, 0.60))
+  )
+
+#Changing data type from character to factor:
+customer_df$Customer_satisfaction <- as.factor(customer_df$Customer_satisfaction)
+
+
+print(head(customer_df))
+
+```
+<br>
+
+**Step 6:** Insert 3 missing values for both datasets.
+
+Missing values are commonly seen in many datasets as they are introduced during data collection (Kwak and Kim 2017). They can appear in different forms, such as 'N/A', '-', blank spaces, and many other types. Missing values can affect the reliability of the results produced from the analysis, as well as produce bias (Kwak and Kim 2017). In this project, three missing values will be inserted in both datasets by assigning the number of missing rows to '3', followed by setting the seed. Three missing rows will be inserted in the datasets and printed. Afterwards, the missing row indexes will be printed with the data frames to show which rows are missing. Afterwards, N/A values will be assigned to the missing row indexes for the horsepower variable in dataset 1, and to Customer_country for dataset 2. The rows of the inserted N/A values will be printed with the [which(is.na)] included in the code to show they have been successfully placed in both datasets. 
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+* Dataset 1 missing data:
+```{r}
+
+#Generate which 3 rows will be removed at random
+n_missing_rows = 3
+set.seed(03)
+missing_row_indexes = sample(1:n_rows, n_missing_rows)
+print(missing_row_indexes)
+
+#Removing and printing the 3 rows from dataset 1
+print(mitsubishi_df[missing_row_indexes,])
+
+#Generate N/A's for the Horsepower variable in the 3 rows in dataset 1
+mitsubishi_df$Horsepower[missing_row_indexes] <- NA
+print(mitsubishi_df[which(is.na(mitsubishi_df$Horsepower)), ])
+
+```
+Therefore, the rows that will be missing from the datasets are 5, 58, and 12.
+<br>
+<br>
+
+* Dataset 2 missing data:
+```{r}
+
+#Remove the 3 rows from dataset 2
+print(customer_df[missing_row_indexes,])
+
+#Add N/A's for the customer country variable in the 3 rows
+customer_df$Customer_country[missing_row_indexes] <- NA
+
+print(customer_df[which(is.na(customer_df$Customer_country)), ])
+
+```
+<br>
+
+**Step 7:** Insert 2 outliers for both datasets.
+
+Outliers are values which are an abnormal distance from the other majority of values in the same dataset. They are commonly seen in data which is why they will be randomly inserted in both created datasets (Kwak and Kim 2017). Following a similar process to inserting N/A values, two outliers will be inserted in each of the datasets as well. The difference will be to set a different seed and assigning the name of the object to outlier_row_indexes instead. To insert the outliers, c(strtoi()) is used. This means the string value assigned in the code will be placed in the dataset as an integer instead. The outlier values chosen for the fuel efficiency variable are 2 and 15, as they are out of the range which were specified in the dataframe for dataset 1. The customer age outlier values were selected as 16 and 90, which are also outside of the range specified earlier. The rows of both datasets will be printed to show the outlier values inserted successfully. 
+
+```{r}
+
+#Generating 2 random outliers
+n_outliers = 2
+set.seed(02)
+outlier_row_indexes = sample(1:n_rows, n_outliers)
+print(outlier_row_indexes)
+
+```
+Therefore, the outliers are going to be inserted in rows 70 and 6.
+<br>
+<br>
+
+* Dataset 1 outliers:
+```{r}
+
+#Insert 2 outliers for dataset 1
+mitsubishi_df[outlier_row_indexes, "Fuel_efficiency"] <- c(strtoi("2"), strtoi("15"))
+
+print(mitsubishi_df[outlier_row_indexes,])
+
+```
+<br>
+
+* Dataset 2 outliers:
+```{r}
+
+#Insert 2 outliers for dataset 2
+customer_df[outlier_row_indexes, "Customer_age"] <- c(strtoi("16"), strtoi("90"))
+
+print(customer_df[outlier_row_indexes,])
+
+```
+
+
+### **Merging both synthetic datasets**
+
+The full_join() function will be used from the dplyr package to merge all variables from the two synthetic datasets into one dataset. All variables will be joined into one dataset named mitsubishi_sales. Since the same customer names variable are included in both datasets, it will merge all of the vehicle variables and customer information variables together. 
+
+```{r}
+
+#Full-joining the two synthetic datasets
+mitsubishi_sales <- full_join(mitsubishi_df, customer_df, by = "Customer_name")
+
+print(head(mitsubishi_sales))
+
+```
+
+
+### **Inspecting and converting the data** 
+
+The str() function will be used to summarise all the different variable types in the merged dataset.
+
+```{r}
+
+#Viewing the structure of the merged dataset
+str(mitsubishi_sales)
+
+```
+The types of variables included in the merged dataset are characters, factors, and integers. 
+<br>
+
+The customer_satisfaction variable will be converted into ordinal factor variable type. This is because there is an order for the satisfaction levels. The year of purchase and customer age variables will be left as integers as they storing discrete values. The price, horsepower and fuel efficiency variables will be converted to numeric variable types.
+
+```{r}
+
+#Factor labelling and ordering for the Customer's satisfaction variable
+mitsubishi_sales$Customer_satisfaction <- factor(mitsubishi_sales$Customer_satisfaction,
+                                                levels = c(1, 2, 3, 4, 5),
+                                                labels = c("Very Unsatisfied", "Unsatisfied", "Neutral", "Satisfied", "Very Satisfied"),
+                                                ordered = TRUE)
+
+
+#Converting character/integer variables to numeric
+mitsubishi_sales$Fuel_efficiency <- as.numeric(mitsubishi_sales$Fuel_efficiency)
+mitsubishi_sales$Price <- as.numeric(mitsubishi_sales$Price)
+mitsubishi_sales$Horsepower <- as.numeric(mitsubishi_sales$Horsepower)
+
+
+#Re-check the variable structure types
+str(mitsubishi_sales)
+
+```
+After converting the variables to their relevant structures, there are now character, factor, numeric, integer, and ordinal variable types in the merged dataset. There are a total of 12 variables (columns) and 124 observations (rows) in the merged dataset.
+
+###	**Manipulating the data**
+
+* **Creating an Age_category variable**
+
+Two new columns (variables) will be created and added to the mitsubishi_sales dataset. 
+
+One of the new variables will be titled Age_category and based on the Customer_age variable. Therefore, when a customer's age is less than 25, they will be categorised as a young adult, more than or equal to 25 will be an adult, and more than or equal to 60 will be a senior. The case_when() function is used to assign a character when a value is equal to or more/less than a certain value. The TRUE ~ "Unknown" will be used at the end of the code to cover any other cases which are not specified. This variable will be useful to categorise different age groups to identify which group purchases more brand-new Mitsubishi vehicles.
+
+```{r}
+
+#Creating Age_category variable
+mitsubishi_sales <- mitsubishi_sales %>%
+  mutate(Age_Category = case_when(
+    Customer_age < 25 ~ "Young adult", 
+    Customer_age >= 25 & Customer_age <60 ~ "Adult",
+    Customer_age >= 60 ~ "Senior",
+    TRUE ~ "Unknown"  
+  ))
+
+```
+<br>
+
+* **Creating a Fuel_cost_per_year variable**
+
+Another variable will be introduced called Fuel_cost_per_year, which will be useful information to interpret an average cost of how much money (AUD$) will be spent on fuel per annum for that particular Mitsubishi car model. The new variable will be created by mutating the Fuel_efficiency variable to calculate what the fuel cost per year would be on average. 
+
+Firstly, the average fuel cost per litre for diesel and unleaded petrol in the 5 countries included in the dataset was calculated. The average fuel cost per litre was rounded to $1.90 AUD (GPP 2023). 
+
+Secondly, the average distance travelled per year calculated from the 5 countries included in the dataset. The average distance equalled to approximately 9,000 kms per annum (IC 2022).
+
+Therefore, 1.9 will be assigned to fuel_cost_per_litre. The pipe operator will be used to pass the left hand sided information to the first argument on the right hand side. The mutate() function will then be used to calculate the fuel cost per litre multiplied by the fuel efficiency (litres per 100 km) in brackets, then further multiplied by 90 to give an an average travelling distance indication of 9,000 km per year. This will be assigned to the Fuel_cost_per_year variable.
+
+```{r}
+
+#Average fuel cost of England, United States, Canada, Australia, and Japan
+fuel_cost_per_litre <- 1.9
+
+#Creating Fuel_cost_per_year variable
+mitsubishi_sales <- mitsubishi_sales %>%
+  mutate(Fuel_cost_per_year = (fuel_cost_per_litre * Fuel_efficiency) * 90)
+
+```
+
+
+###	**Scan I: Missing values** 
+
+Scanning the data for missing values can be done in a few different ways. To identify how many missing values are in each variable (or column), the colSums(is.na()) can be coded. To identify what the values are of the missing data, (which(is.na())) is coded.
+
+```{r}
+
+#Scanning NA variables in the merged dataset
+colSums(is.na(mitsubishi_sales))
+
+which(is.na(mitsubishi_sales))
+
+```
+This shows that there are 6 missing data values in both the Horsepower and Customer_country variables. All values which are missing from both of the variables are listed underneath.
+<br>
+
+Missing values need to be removed from the dataset to avoid misinterpretation of results and incorrect analysis performed. To remove the missing values, the na.omit() function is used in the code and assigned to clean_mitsubishi_sales data frame.
+
+```{r}
+#Omitting N/A values and assigning it as the clean version of the merged dataset
+clean_mitsubishi_sales <- na.omit(mitsubishi_sales)
+
+print(head(clean_mitsubishi_sales))
+
+```
+After omitting all the N/A values, there are now 115 rows in the dataset.
+
+
+###	**Scan II: Outliers**
+
+To scan for outliers in a normal distribution, there are different methods used such as parametric and non-parametric tests. The non-parametric test includes the Tukey's method of calculating the median and quartile ranges for an individual variable using a box plot (Dolgun et al. 2023). Box plots are useful to show outliers that appear outside the upper and lower fences (Kwak and Kim 2017). A parametric test includes the z-score method which is used after the data has been confirmed to be normally distributed (Dolgun et al. 2023). After identifying the outliers, they are removed from dataset to avoid bias and improve reliability of the statistical analysis performed.
+<br>
+<br>
+
+#### Non-parametric test:
+
+Scanning all the numeric data for outliers will be done by creating univariate box plots for each numeric variable. A box plot is a non-parametric test to scan for outliers, as it is not known whether the data is normally distributed yet (Dolgun et al 2023).
+
+* There are four numeric variables in the mitsubishi_sales dataset (Horsepower, Fuel efficiency, Price, and Fuel cost per year)
+
+* Different colours will be assigned to each boxplot using col = ()
+
+
+```{r, fig.width = 6, fig.height = 4}
+
+#Box plot for horsepower
+clean_mitsubishi_sales$Horsepower %>%
+  boxplot(main = "Box plot of Mitsubishi vehicles horsepower", ylab = "Horsepower (Hp)", col = "green")
+
+```
+
+<br>
+<br>
+<br>
+```{r, fig.width = 6, fig.height = 4}
+
+#Box plot for fuel efficiency
+clean_mitsubishi_sales$Fuel_efficiency %>%
+  boxplot(main = "Box plot of Mitsubishi vehicles fuel efficiency per 100 km", ylab = "Fuel efficiency (litres/100km)", col = "blue")
+
+#Box plot for price
+clean_mitsubishi_sales$Price %>%
+  boxplot(main = "Box plot of Mitsubishi vehicles prices", ylab = "Price ($AUD)", col = "pink")
+
+#Box plot for fuel cost per year
+clean_mitsubishi_sales$Fuel_cost_per_year %>%
+  boxplot(main = "Box plot of Mitsubishi vehicles fuel cost per year", ylab = "Fuel cost per year ($AUD)", col = "purple")
+
+```
+
+There are outliers represented by circles shown in the fuel efficiency and fuel cost per year variable box plots. These values match the outliers that were inserted in the dataset earlier. Due to the small sample size and low variability options in the created dataset, the fuel efficiency and fuel cost per year variables do not form an ideal boxplot that can be visualised properly. Therefore, a parametric test using z-scores will be produced instead. 
+<br>
+<br>
+
+#### Parametric test:
+
+Using a parametric outlier detection method such as z-score, can also help scan for univariate outliers in the numeric variables. The z-score is used to measure the distance from the mean, and each unit is a standard deviation value (Dolgun et al. 2023). To calculate the z-scores, the outliers package will be used to code outliers::scores(type = "z") piped from one of the numeric variables. Afterwards, it will be printed including [which(abs(z.scores)>2)] to show all absolute scores which are greater than 2 standard deviations in the dataset for that particular variable. If a negative symbol is placed beforehand (e.g. [-which(abz(z.scores)>2)]), then this will indicate the removal of the z-score outliers with more than 2 standard deviations. An example of this will be coded for the price variable, although it is already shown from the non-parametric test that there are no outliers.
+
+Another way of removing outliers is to use the scale() function which is used to standardise a numeric variable to have a standard deviation of 1 and assigning it to z_scores. To then show all absolute scores greater than 2 standard deviations, abs(z_scores)>2 is coded. When printing out the outliers, the ! symbol is used before 'outliers' to filter the cleaned mitsubishi sales dataframe and keep all the rows where outliers is considered 'FALSE'. Therefore, all outliers that are 'TRUE' are removed from the dataset.
+
+```{r}
+
+#Z-scores for price variable (example for first coding option)
+z.scores <- clean_mitsubishi_sales$Price %>%
+  outliers::scores(type = "z")
+print(head(clean_mitsubishi_sales[which(abs(z.scores)>2)]))
+
+#Z-scores for fuel efficiency variable & removal of outliers (using the second coding option)
+z_scores <- scale(clean_mitsubishi_sales$Fuel_efficiency)
+outliers <- abs(z_scores) > 2
+print(head(clean_mitsubishi_sales[!outliers, ]))
+
+#Z-scores for fuel cost per year variable & removal of outliers (using the second coding option)
+z_scores <- scale(clean_mitsubishi_sales$Fuel_cost_per_year)
+outliers <- abs(z_scores) > 2
+print(head(clean_mitsubishi_sales[!outliers, ]))
+
+```
+This shows that there are no outliers in the price variable, as assumed due to the non-parametric test showing the data is normally distributed. There are 3 outliers shown in the fuel efficiency and fuel cost per year variables. The same rows are shown in both outputs which are rows numbered 8, 123, and 124. 
+<br>
+
+To apply the removal of outliers to the entire cleaned mitsubishi sales dataset, the [!outliers, ] is coded with the name of the clean merged dataset, and asssigned to a new dataset name called 'final_mitsubishi_sales'. Afterwards, the first 10 rows will be printed using [1:10, ]) to specify how many observations to print.
+
+```{r}
+
+#Removing outliers from the whole clean_mitsubishi_sales dataset
+final_mitsubishi_sales <- clean_mitsubishi_sales[!outliers, ]
+
+#Printing the first 10 observations of the final_mitsubishi_sales dataset
+print(final_mitsubishi_sales[1:10, ])
+
+```
+
+
+###	**Transforming the data** 
+
+Firstly, two of the data in the numeric variables (price and fuel cost per year) will be checked for skewness by producing histograms using hist(). This is done to see if the data was randomly generated according to a normal distribution. It may be difficult to see the normal distribution due to the small sample size (low amount of observations). The central limit theorem states that if the dataset sample size is increased, then the approximation of drawing random values from a normal distribution improves (Dolgun et al. 2023). For example, if there were more than 500 rows in the dataset, then the sample size would increase, thus there would be a more accurate and precise representation of the data being normally distributed.
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+```{r, fig.width = 5.5, fig.height = 4}
+
+#Histogram of Price variable
+hist(final_mitsubishi_sales$Price, col = "pink", main = "Histogram of Mitsubishi vehicle prices", xlab = "Price ($AUD)")
+
+#Histogram of Fuel cost per year variable
+hist(final_mitsubishi_sales$Fuel_cost_per_year, col = "purple", main = "Histogram of Mitsubishi vehicles fuel cost per year", xlab = "Fuel cost per year ($AUD)")
+
+```
+
+The histogram produced for the fuel cost per year variable appears to show a normal distribution, however, the histogram of the price variable is shown to be left-skewed. Therefore, applying a square transformation to the price variable will help reduce the skewness and improve interpretation of data in the histogram figure. 
+<br>
+
+To perform a square transformation, the data values in the price variable will be squared by using ^2 (indicating the values to be raised to the power of 2). The squared values will be allocated to square_price, followed by a new histogram produced with the squared values.
+
+```{r, fig.width = 7, fig.height = 4}
+
+#Square transformation of the Price variable
+square_price <- final_mitsubishi_sales$Price^2
+
+#Re-producing a histogram for the cube transformation of the price variable
+hist(square_price, main = "Histogram of Mitsubishi vehicles square transformation price", xlab = "Squared price ($AUD)", ylab = "Frequency", col = "pink")
+
+```
+After applying square transformation to the price variable, the left skewness is reduced and the graph shows an improved normal distribution bell curve shape.
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+### **Summary statistics**
+
+The summary statistics for each variable can be shown using summary() on the final_mitsubishi_sales dataset (the merged dataset which has been cleaned for missing values and outliers). The minimum, maximum, 1st quartile, 3rd quartile, mean, and median are listed for all numeric variables such as horsepower, fuel efficiency, price, age, year of purchase, and fuel cost per year. The character variables show the length, class, and mode information. The factor variables such as body type, colour, engine type, and customer satisfaction ratings show how many observations are in each level. It is confirmed in the customer satisfaction rating that there are more 'very satisfied' customers who have purchased a Mitsubishi vehicles compared to 'unsatisfied' or 'very unsatisfied'.
+
+```{r}
+#Summary statistics of the cleaned dataset
+summary(final_mitsubishi_sales)
+
+```
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+### **Reference List:**
+
+AW (Automotive World) (2023) *Mitsubishi Motors tops mass-market segment of J.D. Power 2023 U.S. Customer Service Index Study*, Automotive World, accessed 22 July 2023, https://www.automotiveworld.com/news-releases/mitsubishi-motors-tops-mass-market-segment-of-j-d-power-2023-u-s-customer-service-index-study/
+
+Bache S, Wickham H (2022) *magrittr: A Forward-Pipe Operator for R*, R package version 2.0.3, accessed 15 July 2023. https://CRAN.R-project.org/package=magrittr
+
+Dolgun A, Smith S and Stewart D (2023) ‘Data Wrangling’ [modules, MATH2405], RMIT University, Melbourne
+
+GPP (Global Petrol Prices) (2023) *Gasoline prices, litre 31-Jul-2023*, GPP website, accessed 29 July 2023, https://www.globalpetrolprices.com/gasoline_prices/.
+
+Hancock P, Nourbaksh I and Stewart J (2019) ‘On the future of transportation in an era of automated and autonomous vehicles’, *Proceedings of the National Academy of Sciences of the United States of America*, 116(16):7684-7691, doi: 10.1073/pnas.1805770115 
+
+IC (International Comparisons) (2022) *Transportation*, IC website, accessed 29 July 2023, https://internationalcomparisons.org/environmental/transportation/
+
+Kelley A (2021) *Mitsubishi Motors Ranks 3rd Highest Customer Service*, Lawrence Mitsubishi, accessed 17 July 2023, https://www.lawrencemitsubishi.com/mitsubishi-motors-ranks-3rd-highest-customer-service/
+
+Kwak S and Kim J (2017) ‘Statistical data preparation: management of missing values and outliers’, *Korean Journal of Anesthesiology*, 70(4):407-411, doi: 10.4097/kjae.2017.70.4.407
+
+Mitsubishi Motors Australia (2023) *Vehicles*, Mitsubishi Motors website, accessed 17 July 2023, https://www.mitsubishi-motors.com.au/
+
+Thakuriah P (2010) ‘Car Ownership Among Young Adults’, *Transportation Research Record Journal of the Transportation Research Board*, 2156(1):1-8, doi: 10.3141/2156-01
+
+Wickham H (2023) *conflicted: An Alternative Conflict Resolution Strategy*, R package version 1.2.0, accessed 15 July 2023. https://CRAN.R-project.org/package=conflicted
+
+Wickham H, François R, Henry L, Müller K and Vaughan D (2023) *dplyr: A Grammar of Data Manipulation*, R package version 1.1.2, accessed 14 July 2023. https://CRAN.R-project.org/package=dplyr
+
+Xie Y (2023) *knitr: A General-Purpose Package for Dynamic Report Generation in R*, R package version 1.43, accessed 15 July 2023. https://yihui.org/knitr/
+
+Yihui Xie (2014) *The R Series: Implementing Reproducible Computational Research*, Chapman and Hall/CRC, doi:10.1201/9781315373461
+
+Yihui Xie (2015) *The R Series: Dynamic Documents with R and knitr*, 2nd edition, Chapman and Hall/CRC, doi:10.1201/b15166
