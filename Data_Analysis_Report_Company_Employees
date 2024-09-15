@@ -1,0 +1,299 @@
+# %% [markdown]
+# # **Assignment 1**
+# 
+# ### Jana Omaiche
+
+# %% [markdown]
+# ##### **Importing libraries:**
+
+# %%
+import pandas as pd # Data manipulation
+import matplotlib.pyplot as plt # Data visualisations
+import seaborn as sns # Statistical data visualisations
+import numpy as np # Numerical operations
+
+# %% [markdown]
+# ##### **Loading the dataset:**
+
+# %%
+employee_df = pd.read_csv('A1_HR_Employee_Data.csv', sep=',', decimal = '.', header = 0)
+
+print(employee_df.head())
+
+print(employee_df.shape)
+
+# %%
+# Removing irrelevant/misinformative columns
+columns_removed = ['JobSatisfaction', 'TrainingTimesLastYear', 'WorkLifeBalance']
+
+employee_df = employee_df.drop(columns = columns_removed)
+
+
+# %%
+# Re-naming columns
+column_rename_mapping = {'EmployeeID' : 'Employee_ID', 
+                         'BusinessTravel' : 'Business_Travel', 
+                         'BusinessUnit' : 'Business_Unit', 
+                         'EducationLevel' : 'Education_Level', 
+                         'MaritalStatus' : 'Marital_Status',
+                         'MonthlyIncome' : 'Monthly_Income',
+                         'NumCompaniesWorked' : 'Number_Companies_Worked',
+                         'OverTime' : 'Overtime',
+                         'PercentSalaryHike' : 'Salary_Hike_Percentage',
+                         'PerformanceRating' : 'Performance_Rating',
+                         'AverageWeeklyHoursWorked' : 'Weekly_Hours_Avg',
+                         'TotalWorkingYears' : 'Total_Working_Years',
+                         'YearsAtCompany' : 'Years_At_Company',
+                         'YearsInRole' : 'Years_In_Role',
+                         'YearsSinceLastPromotion' : 'Years_Since_Last_Promotion',
+                         'YearsWithCurrManager' : 'Years_With_Current_Manager'}
+
+# Applying rename mapping to dataset
+employee_df.rename(columns = column_rename_mapping, inplace=True)
+
+print(employee_df.columns)
+
+# %% [markdown]
+# ##### **Exploring data types:**
+
+# %%
+employee_df.dtypes
+
+# %%
+# Converting Age variable from numeric to integer
+employee_df['Age'] = pd.to_numeric(employee_df['Age'], errors='coerce').astype('Int64')
+
+# Converting Resigned and Overtime variables from strings to booleans
+employee_df['Resigned'] = employee_df['Resigned'].map({'Yes': True, 'No': False})
+employee_df['Overtime'] = employee_df['Overtime'].map({'Yes': True, 'No': False})
+
+
+# %% [markdown]
+# ##### **Checking for typos:**
+# 
+
+# %%
+# Checking unique values of columns to identify typos
+for column in employee_df.columns:
+    unique_values = employee_df[column].unique()
+    print(f"Column: {column}, Unique Values: {unique_values}")
+
+
+# %%
+# Age column NA removal
+employee_df = employee_df.dropna(subset=['Age'])
+
+# Resigned column NA removal
+employee_df = employee_df.dropna(subset = ['Resigned'])
+
+# Monthly Income NA removal
+employee_df = employee_df.dropna(subset = ['Monthly_Income'])
+
+# Overtime NA removal
+employee_df = employee_df.dropna(subset = ['Overtime'])
+
+# Business Travel column typos
+employee_df['Business_Travel'] = employee_df['Business_Travel'].str.lower()
+employee_df['Business_Travel'] = employee_df['Business_Travel'].replace(['travels_rarely', 'rarely_travel'], 'travel_rarely')
+
+# Gender column typos
+employee_df['Gender'] = employee_df['Gender'].str.lower().str.strip()
+employee_df['Gender'] = employee_df['Gender'].replace(['sales', 'm', 'mmale'], 'male')
+
+# Marital Status column typos
+employee_df['Marital_Status'] = employee_df['Marital_Status'].str.lower().str.strip()
+
+# Removing rows with 'female' as a value in the Business Unit variable
+employee_df = employee_df[employee_df['Business_Unit'] != 'Female']
+employee_df['Business_Unit'] = employee_df['Business_Unit'].str.lower()
+
+# Re-checking unique values after cleaning typos
+for column in employee_df.columns:
+    unique_values = employee_df[column].unique()
+    print(f"Column: {column}, Unique Values: {unique_values}")
+
+
+
+# %% [markdown]
+# ##### **Checking for extra white spaces:**
+
+# %%
+# Checking what columns with string values have extra white space:
+for column in employee_df.columns:
+    try:
+    # Narrowing columns to only include variables with strings
+        if employee_df[column].dtype == 'O':
+            # Sum the amount of extra white spaces
+            extra_whitespace_count = (employee_df[column].str.len() != employee_df[column].str.strip().str.len()).sum()
+
+            if extra_whitespace_count > 0:
+                  print(f"Column '{column}' has {extra_whitespace_count} rows with extra white spaces.")
+            else: 
+                  print(f"Column '{column}' does not have any rows with extra white spaces.")
+    except AttributeError as e:
+        print(f"No string values in '{column}': {e}")
+
+                
+
+# %% [markdown]
+# ##### **Casting all text data to upper case:**
+
+# %%
+# Casting all string data values to upper case
+for column in employee_df.columns:
+    if employee_df[column].dtype == 'O':
+        try:
+            employee_df[column] = employee_df[column].str.upper()
+        except AttributeError as e:
+            print(f"No string values in '{column}': {e}")
+
+print(employee_df.head())
+
+# %% [markdown]
+# ##### **Performing sanity checks:**
+
+# %%
+# Sanity test 1: Age variable (only positive values)
+assert (employee_df['Age'] >= 0).all(), "Test failed: Age contains negative values."
+
+# Sanity test 2: Monthly_Income variable (only positive values)
+assert (employee_df['Monthly_Income'] > 0).all(), "Test failed: Monthly_Income contains non-positive values."
+
+# Sanity test 3: Gender variable should be 'MALE' or 'FEMALE'
+valid_genders = ['MALE', 'FEMALE']
+assert employee_df['Gender'].isin(valid_genders).all(), "Test failed: Gender contains invalid values."
+
+# All tests pass
+print("All sanity checks passed.")
+
+
+# %% [markdown]
+# ##### **Checking for missing values:**
+
+# %%
+# Summing missing values in all variables (columns)
+missing_values = employee_df.isnull().sum()
+print("Columns with missing values:")
+print(missing_values)
+
+
+# %% [markdown]
+# There are no missing values as all N/A values were omitted from the 'Checking for typos' section.
+
+# %% [markdown]
+# #### **Creating Visualisations:**
+
+# %% [markdown]
+# <u>Single variable visualisations:</u>
+
+# %%
+# Nominal variable (Gender) - pie chart
+employees_gender = employee_df['Gender'].value_counts()
+plt.figure(figsize = (8, 8))
+employee_df['Gender'].value_counts().plot.pie(autopct = '%1.1f%%', 
+                                              startangle = 90, 
+                                              colors = sns.color_palette('tab10'),
+                                              labels = None,
+                                              textprops = {'fontsize':14, 'weight' : 'bold'},
+                                              wedgeprops = {'edgecolor': 'black'})
+plt.legend(labels = employees_gender.index, bbox_to_anchor = (1, 0.5), 
+           fontsize = 12, 
+           loc = 'center left', 
+           title = 'GENDER:', 
+           title_fontsize = 12)
+plt.title('Pie chart of employee gender population', fontsize = 16)
+plt.ylabel('')
+plt.show()
+
+# %%
+# Ordinal variable (Education_Level) - bar chart
+
+# Converting Education Level variable from float to integer, then as categorical ordinal
+employee_df['Education_Level'] = employee_df['Education_Level'].astype(int)
+education_levels = {
+    1: 'LOW',
+    2: 'INTERMEDIATE',
+    3: 'MODERATE',
+    4: 'HIGH',
+    5: 'HIGHEST'}
+employee_df['Education_Level'] = employee_df['Education_Level'].map(education_levels)
+education_order = ['LOW', 'INTERMEDIATE', 'MODERATE', 'HIGH', 'HIGHEST']
+ordinal_dtype = pd.CategoricalDtype(categories=education_order, ordered=True)
+
+plt.figure(figsize = (10, 6))
+sns.countplot(x = 'Education_Level', data = employee_df, order = education_order, palette = 'viridis')
+plt.xlabel('Education level', size = 12)
+plt.ylabel('Population of employees', size = 12)
+plt.title("Histogram of employee's education levels", size = 16)
+plt.show()
+
+# %%
+# Interval/Ratio variable (Monthly_Income) - boxplot
+plt.figure(figsize = (10, 4))
+ax = sns.boxplot(x = employee_df['Monthly_Income'], color = 'deeppink')
+plt.title('Box plot of monthly income for all employees', size = 16)
+plt.xlabel('Monthly income ($)', size = 12)
+
+# Set x-axis range
+ax.set_xlim(0, 21000)
+ax.set_xticks(np.arange(0, 21001, 1500))
+ax.set_xticklabels([f"{tick}" for tick in np.arange(0, 21001, 1500)])
+plt.show()
+
+
+# %% [markdown]
+# There are many outliers present in this variable, therefore, they will be removed from the dataset. 
+
+# %%
+# Removing outliers in Monthly_Income variable
+def remove_outliers(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+clean_employee_df = remove_outliers(employee_df, 'Monthly_Income')
+
+# %% [markdown]
+# <u>Relationships between two variables visualisations:</u>
+
+# %%
+# Scatter plot of Monthly_Income vs. Total_Working_Years
+plt.figure(figsize = (10, 6))
+sns.regplot(x = 'Total_Working_Years', y = 'Monthly_Income', data = clean_employee_df, scatter_kws = {'alpha':0.5}, line_kws = {'color' : 'red'})
+plt.title('Scatter plot of monthly income vs. total working years', size = 16)
+plt.xlabel("Employee total working years", size = 12)
+plt.ylabel('Monthly income ($)', size = 12)
+plt.show()
+
+
+
+# %%
+# Box plot of Salary_Hike_Percentage vs. Business_Unit
+plt.figure(figsize = (8, 6))
+sns.boxplot(x = 'Business_Unit', y = 'Salary_Hike_Percentage', data = clean_employee_df, palette = "Set3")
+plt.title('Box plot of employee salary hike percentages across business units', size = 16)
+plt.xlabel('Business unit', size = 12)
+plt.ylabel('Salary hike percentage (%)', size = 12)
+plt.show()
+
+# %%
+# Age vs. Monthly_Income
+plt.figure(figsize = (12, 10))
+sns.jointplot(x = 'Age', y = 'Monthly_Income', data = clean_employee_df, kind = 'hex')
+plt.suptitle('Hexbin plot of age vs. monthly income of employees', fontsize = 16)
+plt.xlabel('Age', size = 12)
+plt.ylabel('Monthly income ($)', size = 12)
+plt.tight_layout()
+plt.show()
+
+# %% [markdown]
+# ##### **Saving the cleaned dataset as a csv file:**
+
+# %%
+# Saving the cleaned dataset as a new CSV file
+clean_employee_df.to_csv('clean_employee_data.csv', index = False)
+
+
