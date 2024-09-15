@@ -1,0 +1,451 @@
+# %% [markdown]
+# # **Assignment 2**
+# 
+# #### Jana Omaiche
+
+# %% [markdown]
+# #### **Importing Libraries:**
+
+# %%
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
+from sklearn.neighbors import NearestNeighbors
+import re
+
+# %% [markdown]
+# #### **Loading Dataset:**
+
+# %%
+# Loading dataset
+employee_data = pd.read_csv('A2_HR_Employee_Data.csv', sep = ',')
+
+# Printing first 6 rows
+print(employee_data.head())
+
+# %% [markdown]
+# #### **Data Exploration:**
+
+# %%
+# Shape (rows & columns)
+print(employee_data.shape)
+
+# %%
+# Variable data types
+print(employee_data.dtypes)
+
+# %%
+# Variable unique counts
+unique_counts = employee_data.nunique()
+print(unique_counts)
+
+# %%
+# Descriptive statistics
+print(employee_data.describe())
+
+# %% [markdown]
+# #### **Exploratory Data Analysis:** 
+# 10 Single Variable Visualisations - 
+
+# %%
+# Graph codes for reproduciblity of single variable charts
+def add_spaces_to_title(title):
+    return re.sub(r'([a-z])([A-Z])', r'\1 \2', title)
+
+def single_variable_chart(data, variable, chart_type = 'hist', palette = 'viridis'):
+    plt.figure(figsize = (10, 6))
+    
+    variable_title = add_spaces_to_title(variable)
+    
+    if chart_type == 'hist':
+        plt.hist(data[variable], bins = 40, color = 'royalblue', edgecolor = 'black')
+        plt.xlabel(variable_title)
+        plt.ylabel('Frequency')
+        plt.title(f'Distribution of employee {variable_title} at Revolution Consulting')
+        plt.grid(True, linewidth = 0.5)
+    
+    elif chart_type == 'bar':
+        sns.countplot(x = variable, data = data, palette = palette)
+        plt.xlabel(variable_title)
+        plt.ylabel('Frequency')
+        plt.title(f'Bar chart of employee {variable_title} at Revolution Consulting')
+        plt.grid(True, linewidth = 0.5)
+    
+    elif chart_type == 'boxplot':
+        ax = sns.boxplot(x = data[variable], color = 'dodgerblue')
+        plt.title(f'Distribution of employee {variable_title} at Revolution Consulting')
+        plt.xlabel(variable_title)
+        ax.set_xlim(0, data[variable].max() + 2500)
+        ax.set_xticks(range(0, data[variable].max() + 2500, 2500))
+        ax.set_xticklabels([f"{tick}" for tick in range(0, data[variable].max() + 2500, 2500)])
+        plt.grid(True, linewidth = 0.5)
+    
+    elif chart_type == 'pie':
+        variable_counts = data[variable].value_counts()
+        plt.pie(variable_counts, labels = None, autopct = '%1.1f%%', startangle = 90, textprops = {'fontsize': 12}, colors = palette)
+        plt.legend(labels = variable_counts.index, bbox_to_anchor = (1, 0.5), fontsize = 12, loc = 'center left', title = variable_title, title_fontsize = 10)
+        plt.title(f'Pie chart of employee {variable_title} at Revolution Consulting', fontsize = 13)
+        plt.ylabel('')
+        plt.grid(True, linewidth = 0.5)
+
+plt.show()
+
+# %%
+# 1. Age
+single_variable_chart(employee_data, 'Age', 'hist')
+
+
+# %%
+# 2. Business Travel
+single_variable_chart(employee_data, 'BusinessTravel', 'bar')
+
+# %%
+# 3. Monthly income 
+single_variable_chart(employee_data, 'MonthlyIncome', 'boxplot')
+plt.xlabel('Monthly Income ($)')
+
+# %%
+# 4. Job satisfaction 
+single_variable_chart(employee_data, 'JobSatisfaction', 'bar')
+plt.xlabel('Job Satisfaction Level (1-4)')
+
+# %%
+# 5. Gender 
+single_variable_chart(employee_data, 'Gender', 'pie', palette = ['dodgerblue', 'hotpink'])
+
+# %%
+# 6. # Years at company 
+single_variable_chart(employee_data, 'YearsAtCompany', 'hist')
+
+# %%
+# 7. Average weekly hours worked
+single_variable_chart(employee_data, 'AverageWeeklyHoursWorked', 'hist')
+
+# %%
+# 8. Overtime 
+single_variable_chart(employee_data, 'OverTime', 'pie', palette = ['red', 'gold'])
+
+
+# %%
+# 9. Education level
+single_variable_chart(employee_data, 'EducationLevel', 'bar')
+plt.xlabel('Education Level (1-5)')
+
+# %%
+# 10. Marital status 
+single_variable_chart(employee_data, 'MaritalStatus', 'pie', palette = ['cornflowerblue', 'orchid', 'gold'])
+
+# %% [markdown]
+# 10 Paired Variables Visualisations - 
+
+# %%
+# Code for reproducibility
+def add_spaces_to_title(variable):
+    return re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', variable)
+
+def pair_variable_chart(data, x_variable, y_variable, chart_type = 'scatter'):
+    plt.figure(figsize = (12, 6))
+
+    x_variable_title = add_spaces_to_title(x_variable)
+    y_variable_title = add_spaces_to_title(y_variable)
+
+    if chart_type == 'scatter':
+        sns.scatterplot(x = x_variable, y = y_variable, data = data, hue = 'Gender', palette = {'Male': 'blue', 'Female': 'deeppink'})
+        plt.title(f'Scatter plot of employee {y_variable_title} and {x_variable_title} at Revolution Consulting', fontsize = 14)
+        plt.legend(bbox_to_anchor = (1.05, 1), loc='upper left', title = 'Gender:')
+        plt.grid(True)
+        sns.regplot(x = x_variable, y = y_variable, data = data, scatter = False, color = 'black')
+
+    elif chart_type == 'violin':
+        sns.violinplot(x = x_variable, y = y_variable, data = data, inner = "quartile", palette = "muted")
+        plt.title(f'Violin plot of employee {y_variable_title} and {x_variable_title} at Revolution Consulting', fontsize = 14)
+        plt.grid(True, linewidth = 0.5)
+
+    elif chart_type == 'hexbin':
+        sns.jointplot(x = x_variable, y = y_variable, data = data, kind = 'hex', color = 'purple')
+        plt.suptitle(f'Hexbin plot of employee {y_variable_title} and {x_variable_title} at Revolution Consulting', y = 1.02)
+        plt.grid(True)
+
+    elif chart_type == 'boxplot':
+        sns.boxplot(x = x_variable, y = y_variable, data = data, palette = 'Set2')
+        plt.title(f'Boxplot of employee {y_variable_title} and {x_variable_title} at Revolution Consulting', fontsize = 14)
+        plt.grid(True)
+
+    elif chart_type == 'line':
+        sns.lineplot(x = x_variable, y = y_variable, data = data, hue = 'Gender', palette = {'Male': 'blue', 'Female': 'deeppink'})
+        plt.title(f'Line graph with confidence interval of employee {y_variable_title} and {x_variable_title} at Revolution Consulting', fontsize = 15)
+        plt.legend(title = 'Gender:', bbox_to_anchor = (1.05, 1), loc = 'upper left')
+        plt.grid(True)
+
+    elif chart_type == 'swarm':
+        sns.swarmplot(x = x_variable, y = y_variable, data = data, hue = 'Gender', palette = {'Male': 'dodgerblue', 'Female': 'hotpink'}, size = 4)
+        plt.title(f'Swarm plot of employee {y_variable_title} and {x_variable_title} at Revolution Consulting', fontsize = 14)
+        plt.legend(bbox_to_anchor = (1.05, 1), loc='upper left', title = 'Gender:')
+        plt.grid(True)
+
+plt.show()
+
+# %%
+# 1. Age vs. Monthly income
+pair_variable_chart(employee_data, 'Age', 'MonthlyIncome', chart_type='violin')
+plt.ylabel('Monthly income ($)')
+
+# %%
+# 2. Job satisfaction vs. Monthly income
+pair_variable_chart(employee_data, 'JobSatisfaction', 'MonthlyIncome', chart_type = 'swarm')
+plt.xlabel('Job Satisfaction Level (1-4)')
+plt.ylabel('Monthly income ($)')
+
+# %%
+# 3. Years at company vs. Monthly income
+pair_variable_chart(employee_data, 'YearsAtCompany', 'MonthlyIncome', chart_type = 'hexbin')
+plt.xlabel('Years at company')
+plt.ylabel('Monthly income ($)')
+
+# %%
+# 4. Education level vs. Monthly income
+pair_variable_chart(employee_data, 'EducationLevel', 'MonthlyIncome', chart_type = 'boxplot')
+plt.xlabel('Education level (1-5)')
+plt.ylabel('Monthly income ($)')
+
+# %%
+# 5. Years in current role vs. Percent salary hike
+pair_variable_chart(employee_data, 'YearsInRole', 'PercentSalaryHike', chart_type = 'line')
+plt.xlim(0, 18)
+plt.xticks(np.arange(0, 19, 1))
+plt.yticks(np.arange(10, 28, 2))
+plt.xlabel('Years in role')
+plt.ylabel('Percent salary hike (%)')
+
+# %%
+# 6. Performance rating vs. Years since last promotion
+pair_variable_chart(employee_data, 'MaritalStatus', 'WorkLifeBalance', chart_type = 'violin')
+plt.xlabel('Marital status')
+plt.ylabel('Work/life balance')
+
+# %%
+# 7. Total working years vs. Monthly income
+pair_variable_chart(employee_data, 'TotalWorkingYears', 'MonthlyIncome', chart_type = 'scatter')
+plt.xlim(-0.5, 40.5)
+plt.xticks(np.arange(0, 41, 5))
+plt.yticks(np.arange(0, 21000, 2000))
+plt.xlabel('Total working years')
+plt.ylabel('Monthly income ($)')
+
+# %%
+# 8. Resigned vs. Years with current manager
+pair_variable_chart(employee_data, 'Resigned', 'YearsWithCurrManager', chart_type = 'boxplot')
+plt.title('Boxplot of employee Years with Current Manager and Resigned at Revolution Consulting', size = 14)
+plt.ylabel('Years with current manager')
+
+
+# %%
+# 9. Education level vs. Performance rating
+pair_variable_chart(employee_data, 'EducationLevel', 'PerformanceRating', chart_type = 'violin')
+plt.xlabel('Education level (1-5)')
+plt.ylabel('Performance rating')
+
+# %%
+# 10. Overtime vs. Monthly income
+pair_variable_chart(employee_data, 'OverTime', 'MonthlyIncome', chart_type = 'swarm')
+plt.xlabel('Overtime')
+plt.ylabel('Monthly income ($)')
+
+# %% [markdown]
+# #### **Data Modelling:**
+
+# %% [markdown]
+# **K-Means:**
+
+# %%
+# Code for plotting the elbow method to determine the k value
+def plot_elbow_method(data, variable):
+    # Define the range of k values to try
+    k_values = range(1, 11)
+
+    # Lists to store results
+    wcss_values = []
+
+    # Fitting K-means models for each k
+    for k in k_values:
+        kmeans = KMeans(n_clusters = k, random_state = 42)
+        kmeans.fit(data[[variable]])
+
+        # Calculate WCSS
+        wcss = kmeans.inertia_
+        wcss_values.append(wcss)
+
+    # Plotting the results
+    plt.figure(figsize = (10, 6))
+    plt.plot(k_values, wcss_values, marker='o')
+    plt.title(f'Elbow method for optimal K-mean value using {variable}')
+    plt.xlabel('Number of clusters (K)')
+    plt.ylabel('Within-cluster sum of squares (WCSS)')
+    plt.xticks(k_values)
+    plt.grid(True)
+    plt.show()
+
+# Printing elbow graphs for 3 different numerical variables
+plot_elbow_method(employee_data, 'TotalWorkingYears')
+plot_elbow_method(employee_data, 'Age')
+plot_elbow_method(employee_data, 'MonthlyIncome')
+plot_elbow_method(employee_data, 'PercentSalaryHike')
+
+
+
+# %% [markdown]
+# * Elbow shows: k = 2
+
+# %%
+# Code for fitting the k-means model
+def fit_kmeans(data, variable, n_clusters=2):
+    # Fit K-means model
+    kmeans = KMeans(n_clusters = n_clusters, random_state=42)
+    kmeans.fit(data[[variable]])
+
+    # Assign cluster labels
+    data[f'{variable}_cluster'] = kmeans.labels_
+
+    # Analyze the characteristics of each cluster
+    cluster_summary = data.groupby(f'{variable}_cluster')[variable].describe()
+
+    return cluster_summary
+
+# %%
+# Total working years
+cluster_summary_working_years = fit_kmeans(employee_data, 'TotalWorkingYears')
+print(cluster_summary_working_years)
+
+# %%
+# Age
+cluster_summary_age = fit_kmeans(employee_data, 'Age')
+print(cluster_summary_age)
+
+# %%
+# Monthly income
+cluster_summary_monthly_income = fit_kmeans(employee_data, 'MonthlyIncome')
+print(cluster_summary_monthly_income)
+
+# %%
+# Percent salary hike
+cluster_summary_monthly_income = fit_kmeans(employee_data, 'PercentSalaryHike')
+print(cluster_summary_monthly_income)
+
+# %%
+# Code for plotting k-means
+def plot_k_means_employee(employee_data_df, k, x_variable, y_variable):
+
+    # Numeric variables for clustering
+    numeric_data = employee_data_df.select_dtypes(include = 'number')
+    
+    # Fittting k-means model
+    km_model = KMeans(n_clusters=k, random_state=2)
+    km_model.fit(numeric_data)
+    
+    clusters = km_model.predict(numeric_data)  
+    
+    # Copying the original df and adding a new column for the cluster labels
+    km_df = employee_data_df.copy()
+    km_df['cluster'] = clusters
+    
+    # Plotting the clustered data
+    plt.scatter(km_df[x_variable], km_df[y_variable], c = clusters, cmap = 'viridis')
+
+    plt.xlabel(x_variable)
+    plt.ylabel(y_variable)
+    plt.title(f'K-Means Clustering with k={k}')
+    plt.colorbar(label = 'Cluster')
+    plt.show()
+
+# %%
+# k = 2 (age vs monthly income)
+plot_k_means_employee(employee_data, k=2, x_variable = 'Age', y_variable = 'MonthlyIncome')
+
+# k = 3 (age vs monthly income)
+plot_k_means_employee(employee_data, k = 3, x_variable = 'Age', y_variable = 'MonthlyIncome')
+
+# %%
+# k = 2 (job satisfaction vs monthly income)
+plot_k_means_employee(employee_data, k = 2, x_variable = 'TotalWorkingYears', y_variable = 'MonthlyIncome')
+
+# k = 3 (job satisfaction vs monthly income)
+plot_k_means_employee(employee_data, k = 3, x_variable = 'TotalWorkingYears', y_variable = 'MonthlyIncome')
+
+# %%
+# k = 2 (Percent salary hike vs monthly income)
+plot_k_means_employee(employee_data, k = 2, x_variable = 'PercentSalaryHike', y_variable = 'MonthlyIncome')
+
+# k = 3 (Percent salary hike vs monthly income)
+plot_k_means_employee(employee_data, k = 3, x_variable = 'PercentSalaryHike', y_variable = 'MonthlyIncome')
+
+# %%
+#k = 2 (Years in role vs monthly income)
+plot_k_means_employee(employee_data, k = 2, x_variable = 'YearsInRole', y_variable = 'MonthlyIncome')
+
+#k = 3 (Years in role vs monthly income)
+plot_k_means_employee(employee_data, k = 3, x_variable = 'YearsInRole', y_variable = 'MonthlyIncome')
+
+# %% [markdown]
+# **DBSCAN:**
+
+# %%
+def plot_dbscan(employee_data_df, x_variable, y_variable, eps = 1.0):
+    
+    # Select only numeric columns for clustering
+    numeric_data = employee_data_df.select_dtypes(include='number')
+
+    # Standardize the numeric data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(numeric_data)
+
+    # Create and fit the DBSCAN model
+    dbscan = DBSCAN(eps = eps, min_samples = 3)
+    clusters = dbscan.fit_predict(scaled_data)
+
+    # Visualize the clusters
+    plt.scatter(numeric_data[x_variable], numeric_data[y_variable], c=clusters, cmap='viridis')
+    plt.xlabel(x_variable)
+    plt.ylabel(y_variable)
+    plt.title('DBSCAN Clustering')
+    plt.colorbar(label='Cluster')
+    plt.show()
+
+
+# %%
+# Age vs monthly income
+# eps = 1
+plot_dbscan(employee_data, x_variable='Age', y_variable = 'MonthlyIncome', eps = 1)
+
+# eps = 2
+plot_dbscan(employee_data, x_variable='Age', y_variable = 'MonthlyIncome', eps = 2)
+
+# %%
+# Total working years vs monthly income
+# eps = 1
+plot_dbscan(employee_data, x_variable = 'TotalWorkingYears', y_variable = 'MonthlyIncome', eps = 1)
+
+# eps = 2
+plot_dbscan(employee_data, x_variable = 'TotalWorkingYears', y_variable = 'MonthlyIncome', eps = 2)
+
+# %%
+# Percent salary hike vs monthly income
+# eps = 1
+plot_dbscan(employee_data, x_variable = 'PercentSalaryHike', y_variable = 'MonthlyIncome', eps = 1)
+
+# eps = 2
+plot_dbscan(employee_data, x_variable = 'PercentSalaryHike', y_variable = 'MonthlyIncome', eps = 2)
+
+# %%
+# Years in role vs monthly income
+# eps = 1
+plot_dbscan(employee_data, x_variable = 'YearsInRole', y_variable = 'MonthlyIncome', eps = 1)
+
+# eps = 2
+plot_dbscan(employee_data, x_variable = 'YearsInRole', y_variable = 'MonthlyIncome', eps = 2)
+
+
